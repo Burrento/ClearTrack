@@ -44,12 +44,25 @@ class ProcessFines extends Command
                     ->where('user_id', $student->id)
                     ->first();
 
-                if (!$attendance || $attendance->status !== 'present') {
+                if (!$attendance) {
+                    // No attendance record at all — mark as absent
+                    Attendance::create([
+                        'event_id' => $event->id,
+                        'user_id' => $student->id,
+                        'status' => 'absent',
+                    ]);
                     $needsFine = true;
                     $reason = 'Missing Attendance';
+                    $this->line("Marked {$student->name} as absent.");
+                } elseif ($attendance->status !== 'present') {
+                    // Has a record but not marked as present (e.g. pending_verification)
+                    $attendance->update(['status' => 'absent']);
+                    $needsFine = true;
+                    $reason = 'Missing Attendance';
+                    $this->line("Marked {$student->name} as absent (was {$attendance->status}).");
                 }
 
-                // Check Survey (if required)
+                // Check Survey (if required and student was present)
                 if (!$needsFine && $event->requires_survey && $event->survey) {
                     $surveyCompleted = $student->surveyResponses()
                         ->whereIn('survey_question_id', $event->survey->questions->pluck('id'))
@@ -62,14 +75,21 @@ class ProcessFines extends Command
                 }
 
                 if ($needsFine && $event->fine_amount > 0) {
-                    Fine::create([
-                        'user_id' => $student->id,
-                        'event_id' => $event->id,
-                        'amount' => $event->fine_amount,
-                        'status' => 'unpaid',
-                        'reason' => $reason,
-                    ]);
-                    $this->line("Fine issued to {$student->name} for {$reason}");
+                    // Avoid duplicate fines
+                    $existingFine = Fine::where('user_id', $student->id)
+                        ->where('event_id', $event->id)
+                        ->exists();
+
+                    if (!$existingFine) {
+                        Fine::create([
+                            'user_id' => $student->id,
+                            'event_id' => $event->id,
+                            'amount' => $event->fine_amount,
+                            'status' => 'unpaid',
+                            'reason' => $reason,
+                        ]);
+                        $this->line("Fine issued to {$student->name} for {$reason}");
+                    }
                 }
             }
 

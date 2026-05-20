@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 use App\Models\Event;
+use App\Models\User;
+use App\Models\Attendance;
+use App\Models\Fine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
+use Carbon\Carbon;
 
 class EventController extends Controller
 {
@@ -99,6 +103,94 @@ class EventController extends Controller
         $event->delete();
 
         return redirect()->route('events.index')->with('status', 'Event deleted successfully.');
+    }
+
+    /**
+     * Process fines for students who missed the event.
+     * Marks absent students and issues fines.
+     */
+    public function processFines(Event $event): RedirectResponse
+    {
+        $this->authorizeDepartment($event);
+
+        // Only process events that have ended
+        if (Carbon::parse($event->end_time)->isFuture()) {
+            return back()->with('error', 'Cannot process fines — this event has not ended yet.');
+        }
+
+        // Prevent double-processing
+        if ($event->fines_processed) {
+            return back()->with('error', 'Fines have already been processed for this event.');
+        }
+
+        // Get all students in the department
+        $students = User::role('student')
+            ->where('department_id', $event->department_id)
+            ->get();
+
+        $absentCount = 0;
+        $fineCount = 0;
+
+        foreach ($students as $student) {
+            $needsFine = false;
+            $reason = '';
+
+            // Check attendance
+            $attendance = Attendance::where('event_id', $event->id)
+                ->where('user_id', $student->id)
+                ->first();
+
+            if (!$attendance) {
+                // No attendance record — mark as absent
+                Attendance::create([
+                    'event_id' => $event->id,
+                    'user_id' => $student->id,
+                    'status' => 'absent',
+                ]);
+                $needsFine = true;
+                $reason = 'Missing Attendance';
+                $absentCount++;
+            } elseif ($attendance->status !== 'present') {
+                // Has a record but not present (e.g. pending_verification)
+                $attendance->update(['status' => 'absent']);
+                $needsFine = true;
+                $reason = 'Missing Attendance';
+                $absentCount++;
+            }
+
+            // Check Survey (if required and student was present)
+            if (!$needsFine && $event->requires_survey && $event->survey) {
+                $surveyCompleted = $student->surveyResponses()
+                    ->whereIn('survey_question_id', $event->survey->questions->pluck('id'))
+                    ->exists();
+
+                if (!$surveyCompleted) {
+                    $needsFine = true;
+                    $reason = 'Missing Survey Completion';
+                }
+            }
+
+            if ($needsFine && $event->fine_amount > 0) {
+                $existingFine = Fine::where('user_id', $student->id)
+                    ->where('event_id', $event->id)
+                    ->exists();
+
+                if (!$existingFine) {
+                    Fine::create([
+                        'user_id' => $student->id,
+                        'event_id' => $event->id,
+                        'amount' => $event->fine_amount,
+                        'status' => 'unpaid',
+                        'reason' => $reason,
+                    ]);
+                    $fineCount++;
+                }
+            }
+        }
+
+        $event->update(['fines_processed' => true]);
+
+        return back()->with('status', "Fines processed: {$absentCount} student(s) marked absent, {$fineCount} fine(s) issued.");
     }
 
     private function authorizeDepartment(Event $event)

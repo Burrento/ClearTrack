@@ -49,6 +49,8 @@ Route::middleware('auth')->group(function () {
 
         Route::get('fines', [FineController::class, 'index'])->name('fines.index');
         Route::post('fines/{fine}/pay', [FineController::class, 'markAsPaid'])->name('fines.markAsPaid');
+
+        Route::post('events/{event}/process-fines', [EventController::class, 'processFines'])->name('events.processFines');
     });
 
     Route::middleware('role:admin')->group(function () {
