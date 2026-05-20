@@ -27,6 +27,7 @@ class StudentController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'max:255', 'unique:users'],
             'rfid_uid' => ['nullable', 'string', 'max:255', 'unique:users'],
+            'year_level' => ['required', 'string', 'in:First Year,Second Year,Third Year,Fourth Year,Fifth Year'],
         ]);
 
         $user = User::create([
@@ -35,6 +36,7 @@ class StudentController extends Controller
             'password' => Hash::make('Dwcc' . $request->username),
             'department_id' => auth()->user()->department_id,
             'rfid_uid' => $request->rfid_uid,
+            'year_level' => $request->year_level,
         ]);
 
         $user->assignRole('student');

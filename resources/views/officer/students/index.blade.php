@@ -78,6 +78,20 @@
                                     <p class="text-red-500 text-xs mt-1 font-medium">{{ $message }}</p>
                                 @enderror
                             </div>
+
+                            <div>
+                                <label for="year_level" class="block text-sm font-semibold text-gray-700 mb-1">Year Level</label>
+                                <select id="year_level" name="year_level" required
+                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none @error('year_level') border-red-500 @enderror">
+                                    <option value="" disabled {{ old('year_level') ? '' : 'selected' }}>Select Year Level</option>
+                                    @foreach(['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'] as $level)
+                                        <option value="{{ $level }}" {{ old('year_level') === $level ? 'selected' : '' }}>{{ $level }}</option>
+                                    @endforeach
+                                </select>
+                                @error('year_level')
+                                    <p class="text-red-500 text-xs mt-1 font-medium">{{ $message }}</p>
+                                @enderror
+                            </div>
                         </div>
                     </div>
 
@@ -103,6 +117,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Number</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Year Level</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RFID</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     </tr>
@@ -113,6 +128,7 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $student->name }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->username }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->department->code ?? 'N/A' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->year_level ?? 'N/A' }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->rfid_uid ?? 'None' }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">
                                 @if($student->isCleared())
@@ -124,7 +140,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No students found.</td>
+                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">No students found.</td>
                         </tr>
                     @endforelse
                 </tbody>

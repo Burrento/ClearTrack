@@ -52,6 +52,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'password' => Hash::make('Dwcc' . $studentId),
             'department_id' => $sit->id,
             'rfid_uid' => '1234567890',
+            'year_level' => 'First Year',
         ]);
         $student->assignRole('student');
     }
