@@ -30,9 +30,8 @@ class RolesAndPermissionsSeeder extends Seeder
         // Create Default Admin
         $admin = User::create([
             'name' => 'System Administrator',
-            'username' => 'SuperAdmin',
-            'email' => 'admin@cleartrack.test',
-            'password' => Hash::make('password'), // Or whatever default the user wants, they said "can be changed"
+            'username' => 'superadmin',
+            'password' => Hash::make('password'),
         ]);
         $admin->assignRole('admin');
 
@@ -40,7 +39,6 @@ class RolesAndPermissionsSeeder extends Seeder
         $officer = User::create([
             'name' => 'SIT Officer',
             'username' => 'SIT_Officer',
-            'email' => 'officer@sit.test',
             'password' => Hash::make('password'),
             'department_id' => $sit->id,
         ]);
@@ -51,7 +49,6 @@ class RolesAndPermissionsSeeder extends Seeder
         $student = User::create([
             'name' => 'Test Student',
             'username' => $studentId,
-            'email' => 'student@sit.test',
             'password' => Hash::make('Dwcc' . $studentId),
             'department_id' => $sit->id,
             'rfid_uid' => '1234567890',
