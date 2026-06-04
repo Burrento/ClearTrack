@@ -52,7 +52,8 @@ class User extends Authenticatable
 
     /**
      * Determine if the user is cleared.
-     * A student is cleared if they have no unpaid fines.
+     * A student is cleared if there is no active clearance period,
+     * or they have zero penalty points within the active period.
      */
     public function isCleared(): bool
     {
@@ -60,7 +61,54 @@ class User extends Authenticatable
             return true;
         }
 
-        return $this->fines()->where('status', 'unpaid')->count() === 0;
+        $clearance = $this->getActiveClearancePeriod();
+
+        if (!$clearance) {
+            return true; // No active clearance — everyone is cleared
+        }
+
+        return $this->getTotalPenaltyPoints() <= 0;
+    }
+
+    /**
+     * Get the active clearance period for the student's department.
+     */
+    public function getActiveClearancePeriod(): ?ClearancePeriod
+    {
+        if (!$this->department_id) {
+            return null;
+        }
+
+        return ClearancePeriod::where('department_id', $this->department_id)
+            ->where('status', 'active')
+            ->latest()
+            ->first();
+    }
+
+    /**
+     * Calculate total penalty points from all events where the student was absent.
+     */
+    public function getTotalPenaltyPoints(): int
+    {
+        return (int) Attendance::where('user_id', $this->id)
+            ->where('status', 'absent')
+            ->join('events', 'attendances.event_id', '=', 'events.id')
+            ->sum('events.penalty_points');
+    }
+
+    /**
+     * Get the matched fine tier for this student based on their accumulated points.
+     * Returns null if no active clearance period or no matching tier.
+     */
+    public function getMatchedTier(): ?array
+    {
+        $clearance = $this->getActiveClearancePeriod();
+
+        if (!$clearance) {
+            return null;
+        }
+
+        return $clearance->matchTier($this->getTotalPenaltyPoints());
     }
 
     /**

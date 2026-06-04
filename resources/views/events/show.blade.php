@@ -30,8 +30,8 @@
                     <p class="text-sm font-bold text-gray-800">{{ $event->end_time }}</p>
                 </div>
                 <div class="p-4 bg-blue-50 rounded-lg">
-                    <p class="text-xs font-semibold text-blue-600 uppercase">Fine Amount</p>
-                    <p class="text-sm font-bold text-gray-800">₱{{ number_format($event->fine_amount, 2) }}</p>
+                    <p class="text-xs font-semibold text-blue-600 uppercase">Penalty Points</p>
+                    <p class="text-sm font-bold text-gray-800">{{ $event->penalty_points }} pts</p>
                 </div>
             </div>
 
@@ -71,16 +71,16 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                         </svg>
-                        Fines Processed
+                        Absences Processed
                     </div>
                 @else
-                    <form action="{{ route('events.processFines', $event) }}" method="POST" onsubmit="return confirm('This will mark all students without attendance as absent and issue fines. Continue?')">
+                    <form action="{{ route('events.processFines', $event) }}" method="POST" onsubmit="return confirm('This will mark all students without attendance as absent. Their penalty points will accumulate. Continue?')">
                         @csrf
                         <button type="submit" class="flex items-center bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 font-bold transition">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            Process Fines
+                            Process Absences
                         </button>
                     </form>
                 @endif

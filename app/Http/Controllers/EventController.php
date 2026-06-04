@@ -43,7 +43,7 @@ class EventController extends Controller
             'start_time' => 'required|date',
             'end_time' => 'required|date|after:start_time',
             'requires_survey' => 'boolean',
-            'fine_amount' => 'required|numeric|min:0',
+            'penalty_points' => 'required|integer|min:0',
         ]);
 
         $validated['department_id'] = Auth::user()->department_id;
@@ -84,7 +84,7 @@ class EventController extends Controller
             'start_time' => 'required|date',
             'end_time' => 'required|date|after:start_time',
             'requires_survey' => 'boolean',
-            'fine_amount' => 'required|numeric|min:0',
+            'penalty_points' => 'required|integer|min:0',
         ]);
 
         $validated['requires_survey'] = $request->has('requires_survey');
@@ -106,8 +106,8 @@ class EventController extends Controller
     }
 
     /**
-     * Process fines for students who missed the event.
-     * Marks absent students and issues fines.
+     * Process absences for students who missed the event.
+     * Marks absent students so their penalty points accumulate.
      */
     public function processFines(Event $event): RedirectResponse
     {
@@ -115,12 +115,12 @@ class EventController extends Controller
 
         // Only process events that have ended
         if (Carbon::parse($event->end_time)->isFuture()) {
-            return back()->with('error', 'Cannot process fines — this event has not ended yet.');
+            return back()->with('error', 'Cannot process — this event has not ended yet.');
         }
 
         // Prevent double-processing
         if ($event->fines_processed) {
-            return back()->with('error', 'Fines have already been processed for this event.');
+            return back()->with('error', 'Absences have already been processed for this event.');
         }
 
         // Get all students in the department
@@ -129,12 +129,8 @@ class EventController extends Controller
             ->get();
 
         $absentCount = 0;
-        $fineCount = 0;
 
         foreach ($students as $student) {
-            $needsFine = false;
-            $reason = '';
-
             // Check attendance
             $attendance = Attendance::where('event_id', $event->id)
                 ->where('user_id', $student->id)
@@ -147,50 +143,17 @@ class EventController extends Controller
                     'user_id' => $student->id,
                     'status' => 'absent',
                 ]);
-                $needsFine = true;
-                $reason = 'Missing Attendance';
                 $absentCount++;
             } elseif ($attendance->status !== 'present') {
                 // Has a record but not present (e.g. pending_verification)
                 $attendance->update(['status' => 'absent']);
-                $needsFine = true;
-                $reason = 'Missing Attendance';
                 $absentCount++;
-            }
-
-            // Check Survey (if required and student was present)
-            if (!$needsFine && $event->requires_survey && $event->survey) {
-                $surveyCompleted = $student->surveyResponses()
-                    ->whereIn('survey_question_id', $event->survey->questions->pluck('id'))
-                    ->exists();
-
-                if (!$surveyCompleted) {
-                    $needsFine = true;
-                    $reason = 'Missing Survey Completion';
-                }
-            }
-
-            if ($needsFine && $event->fine_amount > 0) {
-                $existingFine = Fine::where('user_id', $student->id)
-                    ->where('event_id', $event->id)
-                    ->exists();
-
-                if (!$existingFine) {
-                    Fine::create([
-                        'user_id' => $student->id,
-                        'event_id' => $event->id,
-                        'amount' => $event->fine_amount,
-                        'status' => 'unpaid',
-                        'reason' => $reason,
-                    ]);
-                    $fineCount++;
-                }
             }
         }
 
         $event->update(['fines_processed' => true]);
 
-        return back()->with('status', "Fines processed: {$absentCount} student(s) marked absent, {$fineCount} fine(s) issued.");
+        return back()->with('status', "Absences processed: {$absentCount} student(s) marked absent. Penalty points ({$event->penalty_points} pts) will be added to their totals.");
     }
 
     private function authorizeDepartment(Event $event)

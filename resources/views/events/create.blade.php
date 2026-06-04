@@ -28,9 +28,10 @@
             </div>
 
             <div class="mb-4">
-                <label for="fine_amount" class="block text-sm font-medium text-gray-700">Fine Amount (₱)</label>
-                <input type="number" step="0.01" name="fine_amount" id="fine_amount" value="{{ old('fine_amount', 0) }}" required
+                <label for="penalty_points" class="block text-sm font-medium text-gray-700">Penalty Points</label>
+                <input type="number" name="penalty_points" id="penalty_points" value="{{ old('penalty_points', 0) }}" required min="0"
                     class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <p class="mt-1 text-xs text-gray-500">Points accumulated by students who fail to attend this event.</p>
             </div>
 
             <div class="mb-6 flex items-center">

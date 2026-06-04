@@ -8,6 +8,7 @@ use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\FineController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\ClearanceController;
 
 use Illuminate\Support\Facades\Auth;
 
@@ -51,6 +52,12 @@ Route::middleware('auth')->group(function () {
         Route::post('fines/{fine}/pay', [FineController::class, 'markAsPaid'])->name('fines.markAsPaid');
 
         Route::post('events/{event}/process-fines', [EventController::class, 'processFines'])->name('events.processFines');
+
+        // Clearance management
+        Route::get('clearance', [ClearanceController::class, 'index'])->name('clearance.index');
+        Route::post('clearance/tiers', [ClearanceController::class, 'storeTiers'])->name('clearance.storeTiers');
+        Route::post('clearance/activate', [ClearanceController::class, 'activate'])->name('clearance.activate');
+        Route::post('clearance/deactivate', [ClearanceController::class, 'deactivate'])->name('clearance.deactivate');
     });
 
     Route::middleware('role:admin')->group(function () {

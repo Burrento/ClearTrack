@@ -30,6 +30,9 @@
                                     <a href="{{ route('fines.index') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('fines.*') ? 'border-blue-400' : 'border-transparent' }} text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-blue-700 transition duration-150 ease-in-out">
                                         Fines
                                     </a>
+                                    <a href="{{ route('clearance.index') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('clearance.*') ? 'border-blue-400' : 'border-transparent' }} text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-blue-700 transition duration-150 ease-in-out">
+                                        Clearance
+                                    </a>
                                 @endrole
                                 @role('student')
                                     <a href="{{ route('student.events') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('student.events') ? 'border-blue-400' : 'border-transparent' }} text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-blue-700 transition duration-150 ease-in-out">
@@ -76,6 +79,22 @@
             </div>
         </main>
     </div>
+    <script>
+        function togglePassword(inputId, button) {
+            const input = document.getElementById(inputId);
+            const eyeOpen = button.querySelector('.eye-open');
+            const eyeClosed = button.querySelector('.eye-closed');
+            if (input.type === 'password') {
+                input.type = 'text';
+                eyeOpen.classList.add('hidden');
+                eyeClosed.classList.remove('hidden');
+            } else {
+                input.type = 'password';
+                eyeOpen.classList.remove('hidden');
+                eyeClosed.classList.add('hidden');
+            }
+        }
+    </script>
     @stack('scripts')
 </body>
 </html>

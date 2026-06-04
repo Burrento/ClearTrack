@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\Event;
 use App\Models\User;
-use App\Models\Fine;
 use App\Models\Attendance;
 use Carbon\Carbon;
 use Illuminate\Console\Attributes\Description;
@@ -12,7 +11,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
 #[Signature('cleartrack:process-fines')]
-#[Description('Automatically process fines for students who missed events or surveys.')]
+#[Description('Automatically process absences for students who missed events.')]
 class ProcessFines extends Command
 {
     /**
@@ -20,7 +19,7 @@ class ProcessFines extends Command
      */
     public function handle()
     {
-        $this->info('Starting fine processing...');
+        $this->info('Starting absence processing...');
 
         // Find events that have ended and haven't been processed yet
         $events = Event::where('end_time', '<=', Carbon::now())
@@ -28,17 +27,16 @@ class ProcessFines extends Command
             ->get();
 
         foreach ($events as $event) {
-            $this->info("Processing fines for event: {$event->name}");
+            $this->info("Processing absences for event: {$event->name}");
 
             // Get all students in the department
             $students = User::role('student')
                 ->where('department_id', $event->department_id)
                 ->get();
 
-            foreach ($students as $student) {
-                $needsFine = false;
-                $reason = '';
+            $absentCount = 0;
 
+            foreach ($students as $student) {
                 // Check Attendance
                 $attendance = Attendance::where('event_id', $event->id)
                     ->where('user_id', $student->id)
@@ -51,51 +49,20 @@ class ProcessFines extends Command
                         'user_id' => $student->id,
                         'status' => 'absent',
                     ]);
-                    $needsFine = true;
-                    $reason = 'Missing Attendance';
+                    $absentCount++;
                     $this->line("Marked {$student->name} as absent.");
                 } elseif ($attendance->status !== 'present') {
                     // Has a record but not marked as present (e.g. pending_verification)
                     $attendance->update(['status' => 'absent']);
-                    $needsFine = true;
-                    $reason = 'Missing Attendance';
+                    $absentCount++;
                     $this->line("Marked {$student->name} as absent (was {$attendance->status}).");
-                }
-
-                // Check Survey (if required and student was present)
-                if (!$needsFine && $event->requires_survey && $event->survey) {
-                    $surveyCompleted = $student->surveyResponses()
-                        ->whereIn('survey_question_id', $event->survey->questions->pluck('id'))
-                        ->exists();
-
-                    if (!$surveyCompleted) {
-                        $needsFine = true;
-                        $reason = 'Missing Survey Completion';
-                    }
-                }
-
-                if ($needsFine && $event->fine_amount > 0) {
-                    // Avoid duplicate fines
-                    $existingFine = Fine::where('user_id', $student->id)
-                        ->where('event_id', $event->id)
-                        ->exists();
-
-                    if (!$existingFine) {
-                        Fine::create([
-                            'user_id' => $student->id,
-                            'event_id' => $event->id,
-                            'amount' => $event->fine_amount,
-                            'status' => 'unpaid',
-                            'reason' => $reason,
-                        ]);
-                        $this->line("Fine issued to {$student->name} for {$reason}");
-                    }
                 }
             }
 
             $event->update(['fines_processed' => true]);
+            $this->info("Done: {$absentCount} student(s) marked absent for '{$event->name}' ({$event->penalty_points} pts each).");
         }
 
-        $this->info('Fine processing complete.');
+        $this->info('Absence processing complete.');
     }
 }
