@@ -1,0 +1,98 @@
+erDiagram
+    DEPARTMENTS ||--o{ USERS : "belongs to"
+    DEPARTMENTS ||--o{ EVENTS : "organizes"
+    DEPARTMENTS ||--o{ CLEARANCE_PERIODS : "manages"
+    USERS ||--o{ ATTENDANCES : "records"
+    USERS ||--o{ FINES : "incurs"
+    USERS ||--o{ SURVEY_RESPONSES : "submits"
+    USERS ||--o{ ATTENDANCES : "verifies"
+    EVENTS ||--o{ ATTENDANCES : "has"
+    EVENTS ||--o{ FINES : "generates"
+    EVENTS ||--o| SURVEYS : "requires"
+    SURVEYS ||--o{ SURVEY_QUESTIONS : "contains"
+    SURVEY_QUESTIONS ||--o{ SURVEY_RESPONSES : "collects"
+
+    USERS {
+        bigint id PK
+        string name
+        string username
+        string password
+        bigint department_id FK
+        string rfid_uid
+        string year_level
+        boolean is_cleared
+        string remember_token
+        timestamps created_at_updated_at
+    }
+
+    DEPARTMENTS {
+        bigint id PK
+        string name
+        string code UK
+        timestamps created_at_updated_at
+    }
+
+    EVENTS {
+        bigint id PK
+        bigint department_id FK
+        string name
+        datetime start_time
+        datetime end_time
+        boolean requires_survey
+        decimal penalty_points
+        boolean fines_processed
+        timestamps created_at_updated_at
+    }
+
+    ATTENDANCES {
+        bigint id PK
+        bigint event_id FK
+        bigint user_id FK
+        enum status
+        string photo_path
+        bigint verified_by_id FK
+        timestamps created_at_updated_at
+    }
+
+    FINES {
+        bigint id PK
+        bigint user_id FK
+        bigint event_id FK "nullable"
+        decimal amount
+        enum status
+        text reason
+        timestamps created_at_updated_at
+    }
+
+    CLEARANCE_PERIODS {
+        bigint id PK
+        bigint department_id FK
+        enum status
+        json fine_tiers
+        timestamp activated_at
+        timestamps created_at_updated_at
+    }
+
+    SURVEYS {
+        bigint id PK
+        bigint event_id FK
+        string title
+        text description
+        timestamps created_at_updated_at
+    }
+
+    SURVEY_QUESTIONS {
+        bigint id PK
+        bigint survey_id FK
+        text question_text
+        string type
+        timestamps created_at_updated_at
+    }
+
+    SURVEY_RESPONSES {
+        bigint id PK
+        bigint survey_question_id FK
+        bigint user_id FK
+        text answer
+        timestamps created_at_updated_at
+    }
