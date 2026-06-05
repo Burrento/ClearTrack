@@ -21,7 +21,7 @@
                     @forelse($fines as $fine)
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $fine->user->name }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $fine->event->name }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $fine->event ? $fine->event->name : 'Clearance' }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₱{{ number_format($fine->amount, 2) }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $fine->reason }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">

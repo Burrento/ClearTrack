@@ -1,10 +1,35 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="space-y-6" x-data="{ open: {{ $errors->any() ? 'true' : 'false' }} }">
-    <div class="flex justify-between items-center">
-        <h2 class="text-2xl font-bold text-gray-800">Student Management</h2>
-        <button @click="open = true" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition duration-150">
+<div class="space-y-6" x-data="{ open: {{ $errors->any() ? 'true' : 'false' }}, search: '', yearFilter: '' }">
+    <h2 class="text-2xl font-bold text-gray-800">Student Management</h2>
+
+    <!-- Action Row: Search, Filter, then Register (Left Aligned) -->
+    <div class="flex flex-col lg:flex-row lg:items-center justify-start gap-3">
+        <!-- Search Input -->
+        <div class="relative w-full sm:w-64">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none">
+                <svg class="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
+            </div>
+            <input type="text" x-model="search" placeholder="Search name or ID..."
+                class="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white">
+        </div>
+
+        <!-- Year Level Filter -->
+        <select x-model="yearFilter"
+            class="w-full sm:w-44 px-3 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white">
+            <option value="">All Year Levels</option>
+            <option value="First Year">First Year</option>
+            <option value="Second Year">Second Year</option>
+            <option value="Third Year">Third Year</option>
+            <option value="Fourth Year">Fourth Year</option>
+            <option value="Fifth Year">Fifth Year</option>
+        </select>
+
+        <!-- Register Button -->
+        <button @click="open = true" class="w-fit bg-blue-600 text-white font-bold py-1.5 px-4 rounded-md hover:bg-blue-700 transition duration-150 text-sm whitespace-nowrap">
             Register New Student
         </button>
     </div>
@@ -124,17 +149,24 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     @forelse($students as $student)
-                        <tr>
+                        <tr x-show="
+                            (search === '' || '{{ strtolower($student->name) }}'.includes(search.toLowerCase()) || '{{ strtolower($student->username) }}'.includes(search.toLowerCase()))
+                            && (yearFilter === '' || '{{ $student->year_level }}' === yearFilter)
+                        ">
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $student->name }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->username }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->department->code ?? 'N/A' }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->year_level ?? 'N/A' }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $student->rfid_uid ?? 'None' }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                @if($student->isCleared())
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Cleared</span>
+                                @if($clearanceActive)
+                                    @if($student->isCleared())
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Cleared</span>
+                                    @else
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Not Cleared</span>
+                                    @endif
                                 @else
-                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Not Cleared</span>
+                                    <span class="text-gray-400">—</span>
                                 @endif
                             </td>
                         </tr>

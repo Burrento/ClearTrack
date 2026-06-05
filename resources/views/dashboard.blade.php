@@ -10,12 +10,17 @@
             <div class="mt-6 flex flex-col md:flex-row gap-6">
                 <div class="flex-1 bg-white border p-6 rounded-lg shadow-sm flex flex-col items-center justify-center">
                     <p class="text-sm font-semibold text-gray-500 uppercase mb-2">Clearance Status</p>
-                    @if(Auth::user()->isCleared())
-                        <div class="text-4xl font-black text-green-600">CLEARED</div>
-                        <p class="text-xs text-green-700 mt-2">All obligations met.</p>
+                    @if(Auth::user()->isClearanceActive())
+                        @if(Auth::user()->isCleared())
+                            <div class="text-4xl font-black text-green-600">CLEARED</div>
+                            <p class="text-xs text-green-700 mt-2">All obligations met.</p>
+                        @else
+                            <div class="text-4xl font-black text-red-600">NOT CLEARED</div>
+                            <p class="text-xs text-red-700 mt-2">You have unpaid fines. See details below.</p>
+                        @endif
                     @else
-                        <div class="text-4xl font-black text-red-600">NOT CLEARED</div>
-                        <p class="text-xs text-red-700 mt-2">You have accumulated penalty points. See details below.</p>
+                        <div class="text-2xl font-bold text-gray-400">PENDING</div>
+                        <p class="text-xs text-gray-500 mt-2">Clearance period has not started yet.</p>
                     @endif
                 </div>
                 
@@ -75,7 +80,7 @@
                         <tbody class="divide-y divide-gray-200">
                             @forelse(Auth::user()->fines()->with('event')->latest()->take(5)->get() as $fine)
                                 <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $fine->event->name }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $fine->event ? $fine->event->name : 'Clearance' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₱{{ number_format($fine->amount, 2) }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $fine->status == 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
@@ -107,8 +112,13 @@
                     <a href="{{ route('fines.index') }}" class="text-blue-600 font-bold hover:underline">Manage Fines &rarr;</a>
                 </div>
                 <div class="bg-white border p-6 rounded-lg shadow-sm hover:shadow-md transition">
+                    <h3 class="font-bold text-gray-800 mb-2">Fines Settings</h3>
+                    <p class="text-sm text-gray-500 mb-4">Define fine tiers and process student fines.</p>
+                    <a href="{{ route('fines-settings.index') }}" class="text-blue-600 font-bold hover:underline">Fines Settings &rarr;</a>
+                </div>
+                <div class="bg-white border p-6 rounded-lg shadow-sm hover:shadow-md transition">
                     <h3 class="font-bold text-gray-800 mb-2">Clearance</h3>
-                    <p class="text-sm text-gray-500 mb-4">Define fine tiers and activate clearance.</p>
+                    <p class="text-sm text-gray-500 mb-4">Clear students after settling fines.</p>
                     <a href="{{ route('clearance.index') }}" class="text-blue-600 font-bold hover:underline">Manage Clearance &rarr;</a>
                 </div>
             </div>
@@ -134,7 +144,7 @@
 {{-- NOT CLEARED Popup Modal for Students --}}
 @role('student')
     @php
-        $showPopup = $activeClearance && $activeClearance->isActive() && $totalPoints > 0;
+        $showPopup = Auth::user()->isClearanceActive() && !Auth::user()->isCleared();
     @endphp
 
     @if($showPopup)

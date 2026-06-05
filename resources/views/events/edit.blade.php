@@ -1,0 +1,67 @@
+@extends('layouts.app')
+
+@section('content')
+<div class="max-w-2xl mx-auto bg-white shadow-sm sm:rounded-lg overflow-hidden">
+    <div class="p-6">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Edit Event</h1>
+
+        <form action="{{ route('events.update', $event) }}" method="POST">
+            @csrf
+            @method('PUT')
+
+            <div class="mb-4">
+                <label for="name" class="block text-sm font-medium text-gray-700">Event Name</label>
+                <input type="text" name="name" id="name" value="{{ old('name', $event->name) }}" required
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                @error('name')
+                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="start_time" class="block text-sm font-medium text-gray-700">Start Time</label>
+                    <input type="datetime-local" name="start_time" id="start_time"
+                        value="{{ old('start_time', \Carbon\Carbon::parse($event->start_time)->format('Y-m-d\TH:i')) }}" required
+                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    @error('start_time')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label for="end_time" class="block text-sm font-medium text-gray-700">End Time</label>
+                    <input type="datetime-local" name="end_time" id="end_time"
+                        value="{{ old('end_time', \Carbon\Carbon::parse($event->end_time)->format('Y-m-d\TH:i')) }}" required
+                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    @error('end_time')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label for="penalty_points" class="block text-sm font-medium text-gray-700">Penalty Points</label>
+                <input type="number" name="penalty_points" id="penalty_points"
+                    value="{{ old('penalty_points', $event->penalty_points) }}" required min="0"
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <p class="mt-1 text-xs text-gray-500">Points accumulated by students who fail to attend this event.</p>
+                @error('penalty_points')
+                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="mb-6 flex items-center">
+                <input type="checkbox" name="requires_survey" id="requires_survey" value="1"
+                    {{ old('requires_survey', $event->requires_survey) ? 'checked' : '' }}
+                    class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                <label for="requires_survey" class="ml-2 block text-sm text-gray-700">Requires Survey Completion for Clearance</label>
+            </div>
+
+            <div class="flex justify-end space-x-3">
+                <a href="{{ route('events.show', $event) }}" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Cancel</a>
+                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Update Event</button>
+            </div>
+        </form>
+    </div>
+</div>
+@endsection

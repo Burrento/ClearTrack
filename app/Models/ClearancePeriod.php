@@ -56,6 +56,12 @@ class ClearancePeriod extends Model
             }
         }
 
+        // If no exact match, use the highest tier (student exceeded all ranges)
+        $highestTier = $tiers->first();
+        if ($highestTier && $points >= (int) $highestTier['min_points']) {
+            return $highestTier;
+        }
+
         return null;
     }
 

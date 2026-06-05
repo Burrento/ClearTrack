@@ -30,6 +30,9 @@
                                     <a href="{{ route('fines.index') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('fines.*') ? 'border-blue-400' : 'border-transparent' }} text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-blue-700 transition duration-150 ease-in-out">
                                         Fines
                                     </a>
+                                    <a href="{{ route('fines-settings.index') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('fines-settings.*') ? 'border-blue-400' : 'border-transparent' }} text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-blue-700 transition duration-150 ease-in-out">
+                                        Fines Settings
+                                    </a>
                                     <a href="{{ route('clearance.index') }}" class="inline-flex items-center px-1 pt-1 border-b-2 {{ request()->routeIs('clearance.*') ? 'border-blue-400' : 'border-transparent' }} text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-blue-700 transition duration-150 ease-in-out">
                                         Clearance
                                     </a>

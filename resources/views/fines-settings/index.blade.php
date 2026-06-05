@@ -12,8 +12,8 @@
                     </svg>
                 </div>
                 <div class="ml-3">
-                    <p class="text-sm font-bold text-green-800">Clearance is ACTIVE</p>
-                    <p class="text-xs text-green-700">Activated: {{ $clearance->activated_at->format('M d, Y h:i A') }}. Students with penalty points are being notified.</p>
+                    <p class="text-sm font-bold text-green-800">Fines Processed — Clearance is ACTIVE</p>
+                    <p class="text-xs text-green-700">Processed: {{ $clearance->activated_at->format('M d, Y h:i A') }}. Students can now see their clearance status.</p>
                 </div>
             </div>
         </div>
@@ -26,8 +26,8 @@
                     </svg>
                 </div>
                 <div class="ml-3">
-                    <p class="text-sm font-bold text-yellow-800">Clearance is INACTIVE</p>
-                    <p class="text-xs text-yellow-700">Define fine tiers below and activate when ready.</p>
+                    <p class="text-sm font-bold text-yellow-800">Fines Not Yet Processed</p>
+                    <p class="text-xs text-yellow-700">Define fine tiers below, then press "Process Student Fines" when ready.</p>
                 </div>
             </div>
         </div>
@@ -36,10 +36,10 @@
     {{-- Fine Tier Builder --}}
     <div class="bg-white shadow-sm sm:rounded-lg overflow-hidden">
         <div class="p-6">
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">Clearance Management</h1>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Fines Settings</h1>
             <p class="text-sm text-gray-500 mb-6">Define penalty rules that map accumulated points to fines and requirements.</p>
 
-            <form action="{{ route('clearance.storeTiers') }}" method="POST" id="tierForm">
+            <form action="{{ route('fines-settings.storeTiers') }}" method="POST" id="tierForm">
                 @csrf
 
                 <div id="tiersContainer">
@@ -88,30 +88,32 @@
                     Add Tier
                 </button>
 
-                <div class="flex items-center justify-between border-t pt-4">
+                <div class="flex items-center border-t pt-4">
                     <button type="submit" class="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition">
                         Save Fine Tiers
                     </button>
-
-                    @if($clearance && $clearance->fine_tiers)
-                        @if($clearance->isActive())
-                            <form action="{{ route('clearance.deactivate') }}" method="POST" class="inline" onsubmit="return confirm('Deactivate clearance? Students will no longer see the notification.')">
-                                @csrf
-                                <button type="submit" class="px-6 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition">
-                                    Deactivate Clearance
-                                </button>
-                            </form>
-                        @else
-                            <form action="{{ route('clearance.activate') }}" method="POST" class="inline" onsubmit="return confirm('Activate clearance? All students with penalty points will be notified on their dashboard.')">
-                                @csrf
-                                <button type="submit" class="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition">
-                                    Activate Clearance
-                                </button>
-                            </form>
-                        @endif
-                    @endif
                 </div>
             </form>
+
+            @if($clearance && $clearance->fine_tiers)
+                <div class="mt-4 pt-4 border-t flex justify-end">
+                    @if($clearance->isActive())
+                        <form action="{{ route('fines-settings.reset') }}" method="POST" onsubmit="return confirm('Reset clearance? This will deactivate the clearance period and remove all clearance fines.')">
+                            @csrf
+                            <button type="submit" class="px-6 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition">
+                                Reset Clearance
+                            </button>
+                        </form>
+                    @else
+                        <form action="{{ route('fines-settings.process') }}" method="POST" onsubmit="return confirm('This will calculate fines for all students based on their accumulated penalty points and the fine tiers. Continue?')">
+                            @csrf
+                            <button type="submit" class="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition">
+                                Process Student Fines
+                            </button>
+                        </form>
+                    @endif
+                </div>
+            @endif
         </div>
     </div>
 

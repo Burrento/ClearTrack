@@ -17,8 +17,12 @@ class StudentController extends Controller
             ->where('department_id', auth()->user()->department_id)
             ->with('department')
             ->get();
+
+        $clearanceActive = \App\Models\ClearancePeriod::where('department_id', auth()->user()->department_id)
+            ->where('status', 'active')
+            ->exists();
             
-        return view('officer.students.index', compact('students'));
+        return view('officer.students.index', compact('students', 'clearanceActive'));
     }
 
     public function store(Request $request): RedirectResponse

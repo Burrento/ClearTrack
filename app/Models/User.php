@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'username', 'password', 'department_id', 'rfid_uid', 'year_level'])]
+#[Fillable(['name', 'username', 'password', 'department_id', 'rfid_uid', 'year_level', 'is_cleared'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -51,9 +51,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Determine if the user is cleared.
-     * A student is cleared if there is no active clearance period,
-     * or they have zero penalty points within the active period.
+     * Determine if the user is cleared (manually set by officer).
      */
     public function isCleared(): bool
     {
@@ -61,13 +59,24 @@ class User extends Authenticatable
             return true;
         }
 
+        return (bool) $this->is_cleared;
+    }
+
+    /**
+     * Check if the student has unpaid fines.
+     */
+    public function hasUnpaidFines(): bool
+    {
+        return $this->fines()->where('status', 'unpaid')->count() > 0;
+    }
+
+    /**
+     * Check if there is an active clearance period for the student's department.
+     */
+    public function isClearanceActive(): bool
+    {
         $clearance = $this->getActiveClearancePeriod();
-
-        if (!$clearance) {
-            return true; // No active clearance — everyone is cleared
-        }
-
-        return $this->getTotalPenaltyPoints() <= 0;
+        return $clearance !== null && $clearance->isActive();
     }
 
     /**

@@ -12,8 +12,18 @@ class FineController extends Controller
 {
     public function index(): View
     {
-        $fines = Fine::whereHas('event', function ($query) {
-            $query->where('department_id', Auth::user()->department_id);
+        $departmentId = Auth::user()->department_id;
+
+        // Get fines tied to events in this department OR clearance fines for students in this department
+        $fines = Fine::where(function ($query) use ($departmentId) {
+            $query->whereHas('event', function ($q) use ($departmentId) {
+                $q->where('department_id', $departmentId);
+            })->orWhere(function ($q) use ($departmentId) {
+                $q->whereNull('event_id')
+                  ->whereHas('user', function ($u) use ($departmentId) {
+                      $u->where('department_id', $departmentId);
+                  });
+            });
         })->with(['user', 'event'])->orderBy('created_at', 'desc')->get();
 
         return view('fines.index', compact('fines'));
@@ -21,8 +31,17 @@ class FineController extends Controller
 
     public function markAsPaid(Fine $fine): RedirectResponse
     {
-        if ($fine->event->department_id !== Auth::user()->department_id) {
-            abort(403);
+        $departmentId = Auth::user()->department_id;
+
+        // For event-based fines, check event department; for clearance fines, check user department
+        if ($fine->event_id) {
+            if ($fine->event->department_id !== $departmentId) {
+                abort(403);
+            }
+        } else {
+            if ($fine->user->department_id !== $departmentId) {
+                abort(403);
+            }
         }
 
         $fine->update(['status' => 'paid']);
