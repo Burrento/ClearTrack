@@ -14,13 +14,13 @@ class AttendanceController extends Controller
 {
     public function rfidScanner(Event $event): View
     {
-        $this->authorizeDepartment($event);
+        $this->authorizeDepartment($event->department_id);
         return view('attendance.rfid', compact('event'));
     }
 
     public function logRfid(Request $request, Event $event): RedirectResponse
     {
-        $this->authorizeDepartment($event);
+        $this->authorizeDepartment($event->department_id);
 
         $validated = $request->validate([
             'rfid_uid' => 'required|string',
@@ -77,7 +77,7 @@ class AttendanceController extends Controller
     // Officer Methods
     public function verifySelfies(Event $event): View
     {
-        $this->authorizeDepartment($event);
+        $this->authorizeDepartment($event->department_id);
         
         $pendingAttendances = Attendance::where('event_id', $event->id)
             ->where('status', 'pending_verification')
@@ -89,7 +89,7 @@ class AttendanceController extends Controller
 
     public function approveAttendance(Attendance $attendance, $status): RedirectResponse
     {
-        $this->authorizeDepartment($attendance->event);
+        $this->authorizeDepartment($attendance->event->department_id);
 
         if (!in_array($status, ['present', 'absent'])) {
             abort(400);
@@ -101,12 +101,5 @@ class AttendanceController extends Controller
         ]);
 
         return back()->with('status', "Attendance marked as {$status}.");
-    }
-
-    private function authorizeDepartment(Event $event)
-    {
-        if ($event->department_id !== Auth::user()->department_id) {
-            abort(403);
-        }
     }
 }

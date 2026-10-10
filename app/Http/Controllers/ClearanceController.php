@@ -5,12 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\ClearancePeriod;
 use App\Models\User;
 use App\Models\Fine;
-use App\Models\Attendance;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
-use Carbon\Carbon;
 
 class ClearanceController extends Controller
 {
@@ -19,11 +17,7 @@ class ClearanceController extends Controller
      */
     public function index(): View
     {
-        $departmentId = Auth::user()->department_id;
-
-        $clearance = ClearancePeriod::where('department_id', $departmentId)
-            ->latest()
-            ->first();
+        $clearance = $this->latestClearance();
 
         return view('fines-settings.index', compact('clearance'));
     }
@@ -41,8 +35,6 @@ class ClearanceController extends Controller
             'tiers.*.requirements' => 'nullable|string|max:500',
         ]);
 
-        $departmentId = Auth::user()->department_id;
-
         // Sort tiers by min_points descending for consistent storage
         $tiers = collect($request->tiers)->map(function ($tier) {
             return [
@@ -53,13 +45,13 @@ class ClearanceController extends Controller
             ];
         })->sortByDesc('min_points')->values()->toArray();
 
-        $clearance = ClearancePeriod::where('department_id', $departmentId)->latest()->first();
+        $clearance = $this->latestClearance();
 
         if ($clearance) {
             $clearance->update(['fine_tiers' => $tiers]);
         } else {
             ClearancePeriod::create([
-                'department_id' => $departmentId,
+                'department_id' => Auth::user()->department_id,
                 'status' => 'inactive',
                 'fine_tiers' => $tiers,
             ]);
@@ -73,29 +65,15 @@ class ClearanceController extends Controller
      */
     public function activate(): RedirectResponse
     {
-        $departmentId = Auth::user()->department_id;
-        $clearance = ClearancePeriod::where('department_id', $departmentId)->latest()->first();
+        $clearance = $this->latestClearance();
 
         if (!$clearance || empty($clearance->fine_tiers)) {
             return back()->with('error', 'You must define fine tiers before processing fines.');
         }
 
-        // Get all student IDs in the department
-        $studentIds = User::role('student')
-            ->where('department_id', $departmentId)
-            ->pluck('id');
-
-        // Delete any previous clearance fines so we can recalculate fresh
-        Fine::whereIn('user_id', $studentIds)
-            ->whereNull('event_id')
-            ->delete();
-
-        // Reset all students' cleared status
-        User::whereIn('id', $studentIds)->update(['is_cleared' => false]);
-
-        $students = User::role('student')
-            ->where('department_id', $departmentId)
-            ->get();
+        // Recalculate fresh: drop previous clearance fines and cleared flags
+        $students = $this->departmentStudents()->get();
+        $this->resetClearance($students->pluck('id'));
 
         $fineCount = 0;
 
@@ -128,7 +106,7 @@ class ClearanceController extends Controller
 
         $clearance->update([
             'status' => 'active',
-            'activated_at' => Carbon::now(),
+            'activated_at' => now(),
         ]);
 
         return back()->with('status', "Fines processed: {$fineCount} student(s) fined. Clearance is now active.");
@@ -139,21 +117,10 @@ class ClearanceController extends Controller
      */
     public function deactivate(): RedirectResponse
     {
-        $departmentId = Auth::user()->department_id;
-        $clearance = ClearancePeriod::where('department_id', $departmentId)->latest()->first();
+        $clearance = $this->latestClearance();
 
         if ($clearance) {
-            $studentIds = User::role('student')
-                ->where('department_id', $departmentId)
-                ->pluck('id');
-
-            Fine::whereIn('user_id', $studentIds)
-                ->whereNull('event_id')
-                ->delete();
-
-            // Reset all students' cleared status
-            User::whereIn('id', $studentIds)->update(['is_cleared' => false]);
-
+            $this->resetClearance($this->departmentStudents()->pluck('id'));
             $clearance->update(['status' => 'inactive']);
         }
 
@@ -169,17 +136,12 @@ class ClearanceController extends Controller
      */
     public function clearanceList(): View
     {
-        $departmentId = Auth::user()->department_id;
-
-        $students = User::role('student')
-            ->where('department_id', $departmentId)
+        $students = $this->departmentStudents()
             ->with('department')
             ->orderBy('name')
             ->get();
 
-        $clearanceActive = ClearancePeriod::where('department_id', $departmentId)
-            ->where('status', 'active')
-            ->exists();
+        $clearanceActive = Auth::user()->isClearanceActive();
 
         return view('clearance.list', compact('students', 'clearanceActive'));
     }
@@ -189,9 +151,7 @@ class ClearanceController extends Controller
      */
     public function clearStudent(User $user): RedirectResponse
     {
-        if ($user->department_id !== Auth::user()->department_id) {
-            abort(403);
-        }
+        $this->authorizeDepartment($user->department_id);
 
         if ($user->hasUnpaidFines()) {
             return back()->with('error', "Cannot clear {$user->name} — this student has unpaid fines that need to be paid first.");
@@ -207,12 +167,29 @@ class ClearanceController extends Controller
      */
     public function unclearStudent(User $user): RedirectResponse
     {
-        if ($user->department_id !== Auth::user()->department_id) {
-            abort(403);
-        }
+        $this->authorizeDepartment($user->department_id);
 
         $user->update(['is_cleared' => false]);
 
         return back()->with('status', "{$user->name} clearance has been revoked.");
+    }
+
+    private function latestClearance(): ?ClearancePeriod
+    {
+        return ClearancePeriod::where('department_id', Auth::user()->department_id)->latest()->first();
+    }
+
+    private function departmentStudents()
+    {
+        return User::role('student')->where('department_id', Auth::user()->department_id);
+    }
+
+    /**
+     * Remove clearance fines (fines with no event) and reset cleared status for the given students.
+     */
+    private function resetClearance($studentIds): void
+    {
+        Fine::whereIn('user_id', $studentIds)->whereNull('event_id')->delete();
+        User::whereIn('id', $studentIds)->update(['is_cleared' => false]);
     }
 }

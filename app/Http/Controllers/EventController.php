@@ -1,10 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Models\Event;
-use App\Models\User;
-use App\Models\Attendance;
-use App\Models\Fine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
@@ -38,17 +36,9 @@ class EventController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'start_time' => 'required|date',
-            'end_time' => 'required|date|after:start_time',
-            'requires_survey' => 'boolean',
-            'penalty_points' => 'required|integer|min:0',
-        ]);
+        $validated = $this->validateEvent($request);
 
         $validated['department_id'] = Auth::user()->department_id;
-        $validated['requires_survey'] = $request->has('requires_survey');
-
         Event::create($validated);
 
         return redirect()->route('events.index')->with('status', 'Event created successfully.');
@@ -59,7 +49,7 @@ class EventController extends Controller
      */
     public function show(Event $event): View
     {
-        $this->authorizeDepartment($event);
+        $this->authorizeDepartment($event->department_id);
         return view('events.show', compact('event'));
     }
 
@@ -68,7 +58,7 @@ class EventController extends Controller
      */
     public function edit(Event $event): View
     {
-        $this->authorizeDepartment($event);
+        $this->authorizeDepartment($event->department_id);
         return view('events.edit', compact('event'));
     }
 
@@ -77,17 +67,9 @@ class EventController extends Controller
      */
     public function update(Request $request, Event $event): RedirectResponse
     {
-        $this->authorizeDepartment($event);
+        $this->authorizeDepartment($event->department_id);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'start_time' => 'required|date',
-            'end_time' => 'required|date|after:start_time',
-            'requires_survey' => 'boolean',
-            'penalty_points' => 'required|integer|min:0',
-        ]);
-
-        $validated['requires_survey'] = $request->has('requires_survey');
+        $validated = $this->validateEvent($request);
 
         $event->update($validated);
 
@@ -99,7 +81,7 @@ class EventController extends Controller
      */
     public function destroy(Event $event): RedirectResponse
     {
-        $this->authorizeDepartment($event);
+        $this->authorizeDepartment($event->department_id);
         $event->delete();
 
         return redirect()->route('events.index')->with('status', 'Event deleted successfully.');
@@ -111,7 +93,7 @@ class EventController extends Controller
      */
     public function processFines(Event $event): RedirectResponse
     {
-        $this->authorizeDepartment($event);
+        $this->authorizeDepartment($event->department_id);
 
         // Only process events that have ended
         if (Carbon::parse($event->end_time)->isFuture()) {
@@ -123,43 +105,23 @@ class EventController extends Controller
             return back()->with('error', 'Absences have already been processed for this event.');
         }
 
-        // Get all students in the department
-        $students = User::role('student')
-            ->where('department_id', $event->department_id)
-            ->get();
-
-        $absentCount = 0;
-
-        foreach ($students as $student) {
-            // Check attendance
-            $attendance = Attendance::where('event_id', $event->id)
-                ->where('user_id', $student->id)
-                ->first();
-
-            if (!$attendance) {
-                // No attendance record — mark as absent
-                Attendance::create([
-                    'event_id' => $event->id,
-                    'user_id' => $student->id,
-                    'status' => 'absent',
-                ]);
-                $absentCount++;
-            } elseif ($attendance->status !== 'present') {
-                // Has a record but not present (e.g. pending_verification)
-                $attendance->update(['status' => 'absent']);
-                $absentCount++;
-            }
-        }
-
-        $event->update(['fines_processed' => true]);
+        $absentCount = $event->markAbsentees();
 
         return back()->with('status', "Absences processed: {$absentCount} student(s) marked absent. Penalty points ({$event->penalty_points} pts) will be added to their totals.");
     }
 
-    private function authorizeDepartment(Event $event)
+    private function validateEvent(Request $request): array
     {
-        if ($event->department_id !== Auth::user()->department_id) {
-            abort(403);
-        }
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'start_time' => 'required|date',
+            'end_time' => 'required|date|after:start_time',
+            'requires_survey' => 'boolean',
+            'penalty_points' => 'required|integer|min:0',
+        ]);
+
+        $validated['requires_survey'] = $request->has('requires_survey');
+
+        return $validated;
     }
 }

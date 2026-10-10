@@ -23,4 +23,33 @@ class Event extends Model
     {
         return $this->hasOne(Survey::class);
     }
+
+    /**
+     * Mark every department student without a "present" attendance as absent,
+     * flag the event as processed, and return how many were marked.
+     */
+    public function markAbsentees(): int
+    {
+        $attendances = $this->attendances()->get()->keyBy('user_id');
+        $absentCount = 0;
+
+        $students = User::role('student')->where('department_id', $this->department_id)->get();
+
+        foreach ($students as $student) {
+            $attendance = $attendances->get($student->id);
+
+            if (!$attendance) {
+                $this->attendances()->create(['user_id' => $student->id, 'status' => 'absent']);
+                $absentCount++;
+            } elseif ($attendance->status !== 'present') {
+                // e.g. pending_verification
+                $attendance->update(['status' => 'absent']);
+                $absentCount++;
+            }
+        }
+
+        $this->update(['fines_processed' => true]);
+
+        return $absentCount;
+    }
 }

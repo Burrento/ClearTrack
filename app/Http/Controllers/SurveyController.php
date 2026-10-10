@@ -16,13 +16,13 @@ class SurveyController extends Controller
     // Officer Methods
     public function create(Event $event): View
     {
-        $this->authorizeDepartment($event);
+        $this->authorizeDepartment($event->department_id);
         return view('surveys.create', compact('event'));
     }
 
     public function store(Request $request, Event $event): RedirectResponse
     {
-        $this->authorizeDepartment($event);
+        $this->authorizeDepartment($event->department_id);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -68,12 +68,5 @@ class SurveyController extends Controller
         }
 
         return redirect()->route('student.events')->with('status', 'Survey submitted successfully.');
-    }
-
-    private function authorizeDepartment(Event $event)
-    {
-        if ($event->department_id !== Auth::user()->department_id) {
-            abort(403);
-        }
     }
 }
