@@ -8,7 +8,11 @@ if (nfcInput) {
     scans.onopen = () => status && (status.textContent = 'Scanner connected');
     scans.onerror = () => status && (status.textContent = 'Scanner not connected - run tools/acr122u_bridge.py');
     scans.onmessage = (e) => {
-        nfcInput.value = e.data;
-        if (nfcInput.hasAttribute('data-nfc-submit')) nfcInput.form.submit();
+        if (nfcInput.hasAttribute('data-nfc-submit')) {
+            nfcInput.value = e.data;
+            nfcInput.form.submit();
+        } else {
+            nfcInput.value = e.data.match(/.{1,2}/g).join(':'); // 04:A1:B2..., server strips the colons
+        }
     };
 }

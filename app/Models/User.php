@@ -63,6 +63,14 @@ class User extends Authenticatable
     }
 
     /**
+     * RFID serial key grouped for display, e.g. 04:A1:B2:C3. Stored without separators.
+     */
+    public function formattedRfid(): ?string
+    {
+        return $this->rfid_uid ? implode(':', str_split($this->rfid_uid, 2)) : null;
+    }
+
+    /**
      * Check if the student has unpaid fines.
      */
     public function hasUnpaidFines(): bool

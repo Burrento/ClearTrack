@@ -9,6 +9,23 @@
         </div>
         
         <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
+            <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 pb-6 border-b border-gray-200 text-sm">
+                <div>
+                    <dt class="font-medium text-gray-500">Name</dt>
+                    <dd class="mt-1 text-gray-900">{{ auth()->user()->name }}</dd>
+                </div>
+                <div>
+                    <dt class="font-medium text-gray-500">ID Number</dt>
+                    <dd class="mt-1 text-gray-900">{{ auth()->user()->username }}</dd>
+                </div>
+                @role('student')
+                    <div>
+                        <dt class="font-medium text-gray-500">RFID Serial Key</dt>
+                        <dd class="mt-1 text-gray-900 font-mono tracking-wider">{{ auth()->user()->formattedRfid() ?? 'None' }}</dd>
+                    </div>
+                @endrole
+            </dl>
+
             @if (session('status') === 'password-updated')
                 <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
                     <span class="block sm:inline">Password updated successfully.</span>
