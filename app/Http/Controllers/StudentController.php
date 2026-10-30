@@ -27,7 +27,11 @@ class StudentController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $request->merge(['username' => strtoupper(trim((string) $request->username))]);
+        $request->merge([
+            'username' => strtoupper(trim((string) $request->username)),
+            // Accept serials typed with colons/dashes/spaces; store bare hex to match scans
+            'rfid_uid' => strtoupper(preg_replace('/[^0-9A-Fa-f]/', '', (string) $request->rfid_uid)) ?: null,
+        ]);
 
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -47,6 +51,7 @@ class StudentController extends Controller
 
         $user->assignRole('student');
 
-        return redirect()->route('students.index')->with('status', 'Student registered successfully. Default password is Dwcc' . $request->username);
+        return redirect()->route('students.index')->with('status', 'Student registered successfully. Default password is Dwcc' . $request->username
+            . '. RFID Serial Key: ' . ($user->formattedRfid() ?? 'None'));
     }
 }
