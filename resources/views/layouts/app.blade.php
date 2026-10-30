@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name', 'ClearTrack') }}</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/lgc-nursing-logo.png') }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-gray-100 font-sans antialiased">
@@ -13,7 +14,10 @@
                 <div class="flex justify-between h-16">
                     <div class="flex">
                         <div class="shrink-0 flex items-center">
-                            <a href="{{ route('dashboard') }}" class="text-2xl font-bold text-blue-600">ClearTrack</a>
+                            <a href="{{ route('dashboard') }}" class="flex items-center gap-2 text-2xl font-bold text-blue-600">
+                                <img src="{{ asset('images/lgc-nursing-logo.png') }}" alt="Luna Goco Colleges, College of Nursing" class="h-10 w-10">
+                                ClearTrack
+                            </a>
                         </div>
                         <div class="hidden space-x-8 sm:-my-px sm:ml-10 sm:flex">
                             @auth

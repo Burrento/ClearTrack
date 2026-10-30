@@ -89,6 +89,7 @@
                             <div>
                                 <label for="username" class="block text-sm font-semibold text-gray-700 mb-1">ID Number</label>
                                 <input id="username" type="text" name="username" value="{{ old('username') }}" required
+                                    placeholder="LGC25-105680" pattern="[Ll][Gg][Cc]\d{2}-\d{6}" title="Format: LGC25-105680"
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none @error('username') border-red-500 @enderror">
                                 @error('username')
                                     <p class="text-red-500 text-xs mt-1 font-medium">{{ $message }}</p>
@@ -97,8 +98,9 @@
 
                             <div>
                                 <label for="rfid_uid" class="block text-sm font-semibold text-gray-700 mb-1">RFID</label>
-                                <input id="rfid_uid" type="text" name="rfid_uid" value="{{ old('rfid_uid') }}"
+                                <input id="rfid_uid" type="text" name="rfid_uid" value="{{ old('rfid_uid') }}" data-nfc placeholder="Tap card on scanner"
                                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none @error('rfid_uid') border-red-500 @enderror">
+                                <p id="nfc-status" class="text-xs text-gray-500 mt-1"></p>
                                 @error('rfid_uid')
                                     <p class="text-red-500 text-xs mt-1 font-medium">{{ $message }}</p>
                                 @enderror

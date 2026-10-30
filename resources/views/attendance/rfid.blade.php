@@ -13,12 +13,12 @@
                 </svg>
             </div>
             <p class="text-sm text-gray-500">Please tap student RFID card on the scanner.</p>
+            <p id="nfc-status" class="text-xs text-gray-400 mt-1">Connecting to scanner...</p>
         </div>
 
         <form action="{{ route('attendance.logRfid', $event) }}" method="POST" id="rfid-form">
             @csrf
-            <input type="text" name="rfid_uid" id="rfid_uid" autocomplete="off" autofocus
-                class="opacity-0 absolute" style="pointer-events: none;">
+            <input type="hidden" name="rfid_uid" data-nfc data-nfc-submit>
         </form>
 
         <div id="status-display" class="mt-4">
@@ -40,22 +40,4 @@
     </div>
 </div>
 
-<script>
-    // Keep focus on the input field
-    const rfidInput = document.getElementById('rfid_uid');
-    
-    document.addEventListener('click', () => {
-        rfidInput.focus();
-    });
-
-    // Auto-focus on load
-    window.onload = () => {
-        rfidInput.focus();
-    };
-
-    // If focus is lost, regain it
-    rfidInput.onblur = () => {
-        setTimeout(() => rfidInput.focus(), 10);
-    };
-</script>
 @endsection

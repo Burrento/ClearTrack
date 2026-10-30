@@ -19,7 +19,7 @@ vendor/bin/pint           # format PHP
 php artisan cleartrack:process-fines   # mark absences for all ended, unprocessed events
 ```
 
-Seeded logins (`RolesAndPermissionsSeeder`): `superadmin` / `password` (admin), `SIT_Officer` / `password` (officer), `51410` / `Dwcc51410` (student). Login is by `username`, not email.
+Seeded logins (`RolesAndPermissionsSeeder`): `superadmin` / `password` (admin), `SIT_Officer` / `password` (officer), `LGC25-105680` / `DwccLGC25-105680` (student). Login is by `username`, not email.
 
 ## Architecture
 
