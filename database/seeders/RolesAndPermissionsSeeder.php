@@ -45,7 +45,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $officer->assignRole('officer');
 
         // Create a test Student for SIT
-        $studentId = '51410';
+        $studentId = 'LGC25-105680';
         $student = User::create([
             'name' => 'Test Student',
             'username' => $studentId,

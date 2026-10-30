@@ -3,6 +3,8 @@
 @section('content')
 <div class="flex flex-col items-center justify-center">
     <div class="w-full max-w-md bg-white rounded-lg shadow-md p-8">
+        <img src="{{ asset('images/lgc-nursing-logo.png') }}" alt="Luna Goco Colleges, College of Nursing" class="mx-auto h-28 w-28 mb-3">
+        <p class="text-sm font-semibold text-center text-gray-600 mb-4">Luna Goco Colleges, Inc. — College of Nursing</p>
         <h2 class="text-2xl font-bold mb-6 text-center text-gray-800">Login to ClearTrack</h2>
         
         <form method="POST" action="{{ route('login') }}">

@@ -27,9 +27,11 @@ class StudentController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $request->merge(['username' => strtoupper(trim((string) $request->username))]);
+
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'username' => ['required', 'string', 'max:255', 'unique:users'],
+            'username' => ['required', 'string', 'regex:/^LGC\d{2}-\d{6}$/', 'unique:users'],
             'rfid_uid' => ['nullable', 'string', 'max:255', 'unique:users'],
             'year_level' => ['required', 'string', 'in:First Year,Second Year,Third Year,Fourth Year,Fifth Year'],
         ]);
