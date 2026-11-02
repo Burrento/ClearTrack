@@ -18,11 +18,13 @@ DigitalOcean → **Create → Droplets**:
 |---|---|
 | Region | **Singapore** (closest to the Philippines) |
 | Image | **Ubuntu 24.04 LTS** |
-| Size | Basic → Regular → **2 GB RAM / 1 CPU** |
+| Size | Basic → Regular → **1 GB RAM / 1 CPU** ($6/mo) |
 | Authentication | **SSH key** (safer than a password) |
-| Extras | Tick **Monitoring**. Tick **Backups** if the credit allows. |
+| Extras | Tick **Monitoring**. Leave paid Backups off; step 9 covers backups for free. |
 
 Note the server's IP address.
+
+**Cost:** billing is hourly, so $5 credit runs the 1 GB server for about 3½ weeks. Create it about 2 weeks before the event. Afterwards, **destroy** it if it isn't continuing; a powered-off Droplet still bills. Set Billing → **Billing Alerts** at $5.
 
 **Firewall** (Networking → Firewalls → create, apply to the Droplet). Allow inbound:
 - 22 (SSH)
@@ -39,8 +41,12 @@ CloudPanel is a free control panel. It sets up Nginx, PHP, MySQL and HTTPS for y
    ```bash
    ssh root@<server-ip>
    ```
-2. Copy the install command from **cloudpanel.io/docs → Getting Started → DigitalOcean**. Choose **Ubuntu 24.04** and **MySQL 8**, run it, and wait about 5 minutes.
-3. Open `https://<server-ip>:8443`. Click past the certificate warning and create the CloudPanel admin user.
+2. Add 2 GB of swap, so 1 GB of RAM doesn't run out:
+   ```bash
+   fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
+   ```
+3. Copy the install command from **cloudpanel.io/docs → Getting Started → DigitalOcean**. Choose **Ubuntu 24.04** and **MySQL 8**, run it, and wait about 5 minutes.
+4. Open `https://<server-ip>:8443`. Click past the certificate warning and create the CloudPanel admin user.
 
 ## 4. Create the site and database
 
