@@ -29,7 +29,7 @@ Seeded logins (`RolesAndPermissionsSeeder`): `superadmin` / `password` (admin), 
 
 **Attendance → points → fines → clearance pipeline:**
 
-1. **Attendance** (`attendances.status`: `present`, `absent`, `pending_verification`, …): officers log `present` via RFID scan (`rfid_uid` on users), or students upload a selfie (stored on the `public` disk under `selfies/`) that an officer approves/rejects.
+1. **Attendance** (`attendances.status`: `present` or `absent`): officers log `present` via RFID scan (`rfid_uid` on users) only. Selfie attendance was removed; the `photo_path` column and `pending_verification` enum value are leftovers with no code using them.
 2. **Absence processing**: after an event ends, every department student without a `present` record gets an `absent` attendance and `events.fines_processed` is set. The logic lives in `Event::markAbsentees()`, called by `EventController::processFines` (manual button) and the `cleartrack:process-fines` command. The command is scheduled every 5 minutes in `routes/console.php` (needs `schedule:run` cron or `schedule:work`).
 3. **Penalty points** are never stored per student; `User::getTotalPenaltyPoints()` sums `events.penalty_points` over the student's `absent` attendances for events starting on/after the current semester's `starts_at`.
 4. **Clearance period** (`ClearancePeriod`, one per department per semester): officers define `fine_tiers` (JSON array of `{min_points, max_points|null, fine_amount, requirements}`) on the "Fines Settings" page. `ClearancePeriod::matchTier()` maps points to a tier (falls back to highest tier if points exceed all ranges).

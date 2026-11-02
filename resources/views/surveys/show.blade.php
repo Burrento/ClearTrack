@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-2xl">
+<div class="mx-auto max-w-2xl">
     <x-page-header :title="$survey->title" :back="route('student.events')" back-label="My events" :description="$survey->description" />
 
     <form action="{{ route('surveys.show', $survey) }}" method="POST" class="panel">

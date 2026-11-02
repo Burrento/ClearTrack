@@ -23,7 +23,6 @@
                     @if($attendance)
                         @switch($attendance->status)
                             @case('present') <x-badge tone="good">Present</x-badge> @break
-                            @case('pending_verification') <x-badge tone="wait">Selfie waiting for review</x-badge> @break
                             @default <x-badge tone="bad">Absent, +{{ $event->penalty_points }} {{ \Illuminate\Support\Str::plural('pt', $event->penalty_points) }}</x-badge>
                         @endswitch
 
@@ -35,7 +34,7 @@
                             @endif
                         @endif
                     @elseif($event->isOpenForAttendance())
-                        <a href="{{ route('attendance.upload', $event) }}" class="btn btn-primary btn-sm">Send a selfie</a>
+                        <x-badge tone="wait">Happening now: tap your ID</x-badge>
                     @elseif($event->phase() === 'upcoming')
                         <x-badge tone="muted">Upcoming</x-badge>
                     @else

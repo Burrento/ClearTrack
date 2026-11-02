@@ -9,8 +9,6 @@ use App\Models\Survey;
 use App\Models\SurveyResponse;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AttendanceSecurityTest extends TestCase
@@ -24,7 +22,6 @@ class AttendanceSecurityTest extends TestCase
     {
         parent::setUp();
         $this->artisan('db:seed', ['--class' => 'RolesAndPermissionsSeeder']);
-        Storage::fake('public');
 
         $this->officer = User::role('officer')->first();
         $this->student = User::role('student')->first();
@@ -41,44 +38,18 @@ class AttendanceSecurityTest extends TestCase
         ]);
     }
 
-    private function uploadSelfie(Event $event)
-    {
-        return $this->actingAs($this->student)->post(route('attendance.upload', $event), [
-            'photo' => UploadedFile::fake()->image('selfie.jpg'),
-        ]);
-    }
-
     private function attendanceStatus(Event $event, User $user): ?string
     {
         return Attendance::where(['event_id' => $event->id, 'user_id' => $user->id])->value('status');
     }
 
-    // Item 1
-    public function test_student_cannot_upload_selfie_for_another_departments_event(): void
+    public function test_officer_cannot_scan_into_another_departments_event(): void
     {
         $other = $this->event(['department_id' => Department::where('code', 'SOA')->value('id')]);
 
-        $this->uploadSelfie($other)->assertForbidden();
-        $this->actingAs($this->student)->get(route('attendance.upload', $other))->assertForbidden();
+        $this->actingAs($this->officer)->post(route('attendance.logRfid', $other), ['rfid_uid' => $this->student->rfid_uid])
+            ->assertForbidden();
         $this->assertNull($this->attendanceStatus($other, $this->student));
-    }
-
-    // Item 2
-    public function test_selfie_cannot_overwrite_present(): void
-    {
-        $event = $this->event();
-        Attendance::create(['event_id' => $event->id, 'user_id' => $this->student->id, 'status' => 'present']);
-
-        $this->uploadSelfie($event)->assertSessionHasErrors('photo');
-        $this->assertSame('present', $this->attendanceStatus($event, $this->student));
-    }
-
-    public function test_selfie_is_accepted_during_event(): void
-    {
-        $event = $this->event();
-
-        $this->uploadSelfie($event)->assertSessionHasNoErrors();
-        $this->assertSame('pending_verification', $this->attendanceStatus($event, $this->student));
     }
 
     // Item 3
@@ -128,7 +99,6 @@ class AttendanceSecurityTest extends TestCase
         foreach ([$upcoming, $processed] as $event) {
             $this->actingAs($this->officer)->post(route('attendance.logRfid', $event), ['rfid_uid' => $this->student->rfid_uid])
                 ->assertSessionHasErrors('rfid_uid');
-            $this->uploadSelfie($event)->assertSessionHasErrors('photo');
         }
 
         $this->assertNull($this->attendanceStatus($upcoming, $this->student));

@@ -51,6 +51,16 @@ class UidReader(CardObserver):
 
 
 class ScanStream(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        # Chrome's preflight before a public site may reach 127.0.0.1 (Private Network Access)
+        if self.headers.get("Origin") != ALLOWED_ORIGIN:
+            self.send_error(403)
+            return
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.end_headers()
+
     def do_GET(self):
         if self.path != "/scans":
             self.send_error(404)

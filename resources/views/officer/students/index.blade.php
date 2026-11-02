@@ -120,7 +120,7 @@
                         <label for="rfid_uid" class="label">RFID card <span class="font-normal text-ink-soft">(optional)</span></label>
                         <input id="rfid_uid" type="text" name="rfid_uid" value="{{ old('rfid_uid') }}" data-nfc readonly placeholder="Tap the card on the reader" autocomplete="off"
                             @class(['input code cursor-not-allowed bg-paper', 'input-invalid' => $errors->has('rfid_uid')])>
-                        <p id="nfc-status" class="hint"></p>
+                        <p id="nfc-status" class="reader-status">Connecting to the card reader…</p>
                         @error('rfid_uid') <p class="field-error">{{ $message }}</p> @enderror
                     </div>
 

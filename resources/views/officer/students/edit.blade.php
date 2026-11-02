@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-lg">
+<div class="mx-auto max-w-lg">
     <x-page-header :title="$student->name" :back="route('students.index')" back-label="Students"
         :description="$student->username . ', ' . $student->year_level" />
 
@@ -25,7 +25,7 @@
                         @class(['input code cursor-not-allowed bg-paper', 'input-invalid' => $errors->has('rfid_uid')])>
                     <button type="button" onclick="document.getElementById('rfid_uid').value = ''" class="btn btn-secondary">Remove</button>
                 </div>
-                <p id="nfc-status" class="hint"></p>
+                <p id="nfc-status" class="reader-status">Connecting to the card reader…</p>
                 <p class="hint">Tap a card to replace the current one, for example when a card is lost.</p>
                 @error('rfid_uid') <p class="field-error">{{ $message }}</p> @enderror
             </div>

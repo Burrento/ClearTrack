@@ -3,14 +3,10 @@
     $semester = \App\Models\Semester::current();
 
     $events = \App\Models\Event::where('department_id', $departmentId)
-        ->withCount([
-            'attendances as present_count' => fn ($q) => $q->where('status', 'present'),
-            'attendances as pending_count' => fn ($q) => $q->where('status', 'pending_verification'),
-        ])->get();
+        ->withCount(['attendances as present_count' => fn ($q) => $q->where('status', 'present')])->get();
 
     $live = $events->filter(fn ($e) => $e->phase() === 'live');
     $next = $events->filter(fn ($e) => $e->phase() === 'upcoming')->sortBy('start_time')->first();
-    $toReview = $events->where('pending_count', '>', 0);
     $toProcess = $events->filter(fn ($e) => $e->phase() === 'ended');
 
     $students = \App\Models\User::role('student')->where('department_id', $departmentId)->where('is_active', true);
@@ -37,12 +33,7 @@
                 <p class="text-lg font-bold">{{ $event->name }}</p>
                 <p class="text-ink-soft">Until {{ $event->endsAt() }}. {{ $event->present_count }} present so far.</p>
             </div>
-            <div class="flex flex-wrap gap-3">
-                @if($event->pending_count)
-                    <a href="{{ route('attendance.verify', $event) }}" class="btn btn-secondary">Review {{ $event->pending_count }} {{ \Illuminate\Support\Str::plural('selfie', $event->pending_count) }}</a>
-                @endif
-                <a href="{{ route('attendance.rfid', $event) }}" class="btn btn-primary">Open scanner</a>
-            </div>
+            <a href="{{ route('attendance.rfid', $event) }}" class="btn btn-primary">Open scanner</a>
         </div>
     @empty
         <div class="panel px-5 py-4 text-ink-soft">
@@ -61,12 +52,6 @@
     <section aria-labelledby="todo-heading">
         <h2 id="todo-heading" class="panel-title mb-4">Needs your attention</h2>
         <ul class="panel divide-y divide-rule">
-            @foreach($toReview as $event)
-                <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-                    <span>{{ $event->pending_count }} {{ \Illuminate\Support\Str::plural('selfie', $event->pending_count) }} to review for <strong>{{ $event->name }}</strong></span>
-                    <a href="{{ route('attendance.verify', $event) }}" class="action">Review</a>
-                </li>
-            @endforeach
             @foreach($toProcess as $event)
                 <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                     <span><strong>{{ $event->name }}</strong> has ended. Absences aren't processed yet.</span>
@@ -79,7 +64,7 @@
                     <a href="{{ route('fines.index') }}" class="action">Record payments</a>
                 </li>
             @endif
-            @if($toReview->isEmpty() && $toProcess->isEmpty() && !$unpaidCount)
+            @if($toProcess->isEmpty() && !$unpaidCount)
                 <li class="px-5 py-4 text-ink-soft">You're all caught up.</li>
             @endif
         </ul>

@@ -4,7 +4,6 @@
 @php
     $attendances = $event->attendances()->with('user')->latest('updated_at')->get();
     $counts = $attendances->countBy('status');
-    $pending = $counts['pending_verification'] ?? 0;
 @endphp
 
 <x-page-header :title="$event->name" :back="route('events.index')" back-label="Events">
@@ -23,10 +22,6 @@
         @if($event->isOpenForAttendance())
             <a href="{{ route('attendance.rfid', $event) }}" class="btn btn-primary btn-lg">Open RFID scanner</a>
         @endif
-
-        <a href="{{ route('attendance.verify', $event) }}" class="btn btn-secondary btn-lg">
-            Review selfies @if($pending)<span class="rounded-full bg-wait-wash px-2 text-sm text-wait">{{ $pending }}</span>@endif
-        </a>
 
         @if($event->survey)
             <span class="btn btn-secondary btn-lg cursor-default">Survey attached</span>
@@ -57,7 +52,7 @@
     <div class="mb-4 flex flex-wrap items-baseline justify-between gap-3">
         <h2 id="log-heading" class="panel-title">Attendance</h2>
         <p class="text-ink-soft">
-            {{ $counts['present'] ?? 0 }} present, {{ $pending }} waiting for review, {{ $counts['absent'] ?? 0 }} absent
+            {{ $counts['present'] ?? 0 }} present, {{ $counts['absent'] ?? 0 }} absent
         </p>
     </div>
     <div class="panel overflow-x-auto">
@@ -77,13 +72,12 @@
                         <td>
                             @switch($attendance->status)
                                 @case('present') <x-badge tone="good">Present</x-badge> @break
-                                @case('pending_verification') <x-badge tone="wait">Waiting for review</x-badge> @break
                                 @default <x-badge tone="bad">{{ ucfirst($attendance->status) }}</x-badge>
                             @endswitch
                         </td>
                         <td class="whitespace-nowrap text-ink-soft">{{ $attendance->updated_at->format('M j, g:i A') }}</td>
                         <td class="text-ink-soft">
-                            @if($attendance->photo_path) Selfie @elseif($attendance->verified_by_id) RFID @else Automatic @endif
+                            {{ $attendance->verified_by_id ? 'RFID' : 'Automatic' }}
                         </td>
                     </tr>
                 @empty

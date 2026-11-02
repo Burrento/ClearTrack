@@ -13,7 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Every page renders for its role with realistic data (live event, pending selfie, open clearance, unpaid fine).
+ * Every page renders for its role with realistic data (live event, open clearance, unpaid fine).
  */
 class PagesRenderTest extends TestCase
 {
@@ -32,7 +32,7 @@ class PagesRenderTest extends TestCase
         $survey = Survey::create(['event_id' => $live->id, 'title' => 'Feedback']);
         $survey->questions()->create(['question_text' => 'How was it?']);
         Attendance::create(['event_id' => $past->id, 'user_id' => $student->id, 'status' => 'absent']);
-        Attendance::create(['event_id' => $live->id, 'user_id' => $student->id, 'status' => 'pending_verification', 'photo_path' => 'selfies/x.jpg']);
+        Attendance::create(['event_id' => $live->id, 'user_id' => $student->id, 'status' => 'present', 'verified_by_id' => $officer->id]);
         ClearancePeriod::create(['department_id' => $officer->department_id, 'semester_id' => $semester->id, 'status' => 'active', 'activated_at' => now(),
             'fine_tiers' => [['min_points' => 1, 'max_points' => null, 'fine_amount' => 50, 'requirements' => 'Letter of apology']]]);
         Fine::create(['user_id' => $student->id, 'semester_id' => $semester->id, 'amount' => 50, 'status' => 'unpaid', 'reason' => 'Clearance Period — 3 pts']);
@@ -43,7 +43,6 @@ class PagesRenderTest extends TestCase
         foreach (['dashboard', 'student.events', 'settings'] as $route) {
             $this->get(route($route))->assertOk();
         }
-        $this->get(route('attendance.upload', $live))->assertOk();
         $this->get(route('surveys.show', $survey))->assertOk();
         $this->get(route('dashboard'))->assertSee('Not cleared')->assertSee('Letter of apology');
 
@@ -51,7 +50,7 @@ class PagesRenderTest extends TestCase
         foreach (['dashboard', 'events.index', 'events.create', 'students.index', 'fines.index', 'fines-settings.index', 'clearance.index', 'settings'] as $route) {
             $this->get(route($route))->assertOk();
         }
-        foreach (['events.show', 'events.edit', 'attendance.rfid', 'attendance.verify', 'surveys.create'] as $route) {
+        foreach (['events.show', 'events.edit', 'attendance.rfid', 'surveys.create'] as $route) {
             $this->get(route($route, $live))->assertOk();
         }
         $this->get(route('dashboard'))->assertSee('Happening now')->assertSee('Open scanner');

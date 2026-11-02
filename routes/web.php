@@ -45,8 +45,6 @@ Route::middleware('auth')->group(function () {
         Route::get('events/{event}/rfid', [AttendanceController::class, 'rfidScanner'])->name('attendance.rfid');
         Route::post('events/{event}/rfid', [AttendanceController::class, 'logRfid'])->name('attendance.logRfid');
         
-        Route::get('events/{event}/verify', [AttendanceController::class, 'verifySelfies'])->name('attendance.verify');
-        Route::post('attendance/{attendance}/approve/{status}', [AttendanceController::class, 'approveAttendance'])->name('attendance.approve');
 
         Route::get('events/{event}/survey/create', [SurveyController::class, 'create'])->name('surveys.create');
         Route::post('events/{event}/survey', [SurveyController::class, 'store'])->name('surveys.store');
@@ -79,8 +77,6 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('role:student')->group(function () {
         Route::get('my-events', [AttendanceController::class, 'studentEvents'])->name('student.events');
-        Route::get('events/{event}/upload', [AttendanceController::class, 'uploadSelfieForm'])->name('attendance.upload');
-        Route::post('events/{event}/upload', [AttendanceController::class, 'storeSelfie']);
 
         // Corrected duplicates
         Route::get('surveys/{survey}', [SurveyController::class, 'show'])->name('surveys.show');

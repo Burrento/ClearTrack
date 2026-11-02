@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-2xl">
+<div class="mx-auto max-w-2xl">
     <x-page-header title="Attach a survey" :back="route('events.show', $event)" :back-label="$event->name"
         description="Students who attended answer it from their events page." />
 

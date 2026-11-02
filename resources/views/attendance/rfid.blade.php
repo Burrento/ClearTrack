@@ -38,7 +38,7 @@
             </svg>
         </span>
         <p class="mt-5 text-2xl font-bold">Ready. Tap a student ID on the reader.</p>
-        <p id="nfc-status" class="mt-2 text-ink-soft">Connecting to the reader…</p>
+        <p id="nfc-status" class="reader-status mt-2">Connecting to the card reader…</p>
     </div>
 </div>
 

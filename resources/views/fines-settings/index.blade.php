@@ -3,7 +3,7 @@
 @section('content')
 @php $hasTiers = $clearance && $clearance->fine_tiers; @endphp
 
-<div class="max-w-4xl">
+<div class="mx-auto max-w-4xl">
     <x-page-header title="Fine tiers" description="Each student's penalty points for the semester are matched to a tier to set their fine." />
 
     @if($errors->any())

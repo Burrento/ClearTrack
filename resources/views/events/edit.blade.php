@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-2xl">
+<div class="mx-auto max-w-2xl">
     <x-page-header title="Edit event" :back="route('events.show', $event)" :back-label="$event->name" />
 
     <form action="{{ route('events.update', $event) }}" method="POST" class="panel panel-body">

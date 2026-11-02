@@ -78,12 +78,9 @@
 
 {{-- Attendance you can still record --}}
 @foreach($openEvents as $event)
-    <section class="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border-2 border-seal bg-seal-wash px-5 py-4">
-        <div>
-            <p class="font-bold">{{ $event->name }} is happening now</p>
-            <p class="text-ink-soft">Ends {{ $event->endsAt() }}. Tap your ID at the officer's table, or send a selfie.</p>
-        </div>
-        <a href="{{ route('attendance.upload', $event) }}" class="btn btn-primary">Send a selfie</a>
+    <section class="mt-6 rounded-xl border-2 border-seal bg-seal-wash px-5 py-4">
+        <p class="font-bold">{{ $event->name }} is happening now</p>
+        <p class="text-ink-soft">Ends {{ $event->endsAt() }}. Tap your ID at the officer's table to be marked present.</p>
     </section>
 @endforeach
 

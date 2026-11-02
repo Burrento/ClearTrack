@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-2xl">
+<div class="mx-auto max-w-2xl">
     <x-page-header title="Create event" :back="route('events.index')" back-label="Events" />
 
     <form action="{{ route('events.store') }}" method="POST" class="panel panel-body">

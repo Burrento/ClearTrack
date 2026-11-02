@@ -5,8 +5,10 @@ if (nfcInput) {
     const status = document.getElementById('nfc-status');
     const scans = new EventSource('http://127.0.0.1:8765/scans');
 
-    scans.onopen = () => status && (status.textContent = 'Scanner connected');
-    scans.onerror = () => status && (status.textContent = 'Scanner not connected - run tools/acr122u_bridge.py');
+    // EventSource keeps retrying, so the status flips back to "on" once the bridge starts.
+    const setStatus = (state, text) => status && (status.dataset.state = state, status.textContent = text);
+    scans.onopen = () => setStatus('on', 'Card reader connected');
+    scans.onerror = () => setStatus('off', 'Card reader offline. Start the reader program on this computer.');
     scans.onmessage = (e) => {
         if (nfcInput.hasAttribute('data-nfc-submit')) {
             nfcInput.value = e.data;
