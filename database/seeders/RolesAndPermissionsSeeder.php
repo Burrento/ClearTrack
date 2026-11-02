@@ -49,7 +49,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $student = User::create([
             'name' => 'Test Student',
             'username' => $studentId,
-            'password' => Hash::make('Dwcc' . $studentId),
+            'password' => Hash::make(User::defaultPassword('Test Student', $studentId)),
             'department_id' => $sit->id,
             'rfid_uid' => '1234567890',
             'year_level' => 'First Year',

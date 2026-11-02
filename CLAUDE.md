@@ -19,20 +19,22 @@ vendor/bin/pint           # format PHP
 php artisan cleartrack:process-fines   # mark absences for all ended, unprocessed events
 ```
 
-Seeded logins (`RolesAndPermissionsSeeder`): `superadmin` / `password` (admin), `SIT_Officer` / `password` (officer), `LGC25-105680` / `DwccLGC25-105680` (student). Login is by `username`, not email.
+Seeded logins (`RolesAndPermissionsSeeder`): `superadmin` / `password` (admin), `SIT_Officer` / `password` (officer), `LGC25-105680` / `Student105680` (student). Login is by `username`, not email.
 
 ## Architecture
 
-**Roles and scoping.** Three roles: `admin`, `officer`, `student`. Routes in `routes/web.php` are grouped by `role:` middleware (aliases registered in `bootstrap/app.php`). Admins manage departments and officers. Officers manage everything for **their own department only** — controllers enforce this via `authorizeDepartment($departmentId)` on the base `Controller` (`abort(403)` on mismatch); there are no policies. Any new officer action must do the same check. Students are created by officers with username = student ID and default password `Dwcc{username}`.
+**Roles and scoping.** Three roles: `admin`, `officer`, `student`. Routes in `routes/web.php` are grouped by `role:` middleware (aliases registered in `bootstrap/app.php`). Admins manage departments, officers and semesters. Officers manage everything for **their own department only** — controllers enforce this via `authorizeDepartment($departmentId)` on the base `Controller` (`abort(403)` on mismatch); there are no policies. Any new officer action must do the same check. Students are created by officers with username = student ID and default password from `User::defaultPassword()` (capitalized last name + last 6 digits of the ID, e.g. `Santos105680`). Graduates/dropouts are deactivated (`users.is_active = false`), never deleted: they can't log in and are skipped by RFID lookup, `markAbsentees()` and the clearance list.
+
+**Semesters**: `Semester::current()` is the most recently started one (by id). The admin's "Start New Semester" (`AdminController::startSemester`) applies to all departments: copies each department's latest `fine_tiers` into a new inactive `ClearancePeriod`, un-clears every student, and can bulk-deactivate a year level. Clearance periods and clearance fines carry `semester_id`; past semesters' rows are history.
 
 **Attendance → points → fines → clearance pipeline:**
 
 1. **Attendance** (`attendances.status`: `present`, `absent`, `pending_verification`, …): officers log `present` via RFID scan (`rfid_uid` on users), or students upload a selfie (stored on the `public` disk under `selfies/`) that an officer approves/rejects.
-2. **Absence processing**: after an event ends, every department student without a `present` record gets an `absent` attendance and `events.fines_processed` is set. The logic lives in `Event::markAbsentees()`, called by `EventController::processFines` (manual button) and the `cleartrack:process-fines` command. The command is not scheduled in `routes/console.php`.
-3. **Penalty points** are never stored per student; `User::getTotalPenaltyPoints()` sums `events.penalty_points` over the student's `absent` attendances.
-4. **Clearance period** (`ClearancePeriod`, one active per department): officers define `fine_tiers` (JSON array of `{min_points, max_points|null, fine_amount, requirements}`) on the "Fines Settings" page. `ClearancePeriod::matchTier()` maps points to a tier (falls back to highest tier if points exceed all ranges).
-5. **Activating** (`ClearanceController::activate`) deletes all existing clearance fines (fines with `event_id = NULL`) for the department, resets `users.is_cleared`, then creates one fine per student from their tier and auto-clears students with 0 points. Re-running recalculates from scratch; `deactivate` removes those fines. Fines with a non-null `event_id` are legacy per-event fines and are not touched.
-6. **Clearance**: officers manually set `users.is_cleared`; clearing is blocked while the student has `unpaid` fines.
+2. **Absence processing**: after an event ends, every department student without a `present` record gets an `absent` attendance and `events.fines_processed` is set. The logic lives in `Event::markAbsentees()`, called by `EventController::processFines` (manual button) and the `cleartrack:process-fines` command. The command is scheduled every 5 minutes in `routes/console.php` (needs `schedule:run` cron or `schedule:work`).
+3. **Penalty points** are never stored per student; `User::getTotalPenaltyPoints()` sums `events.penalty_points` over the student's `absent` attendances for events starting on/after the current semester's `starts_at`.
+4. **Clearance period** (`ClearancePeriod`, one per department per semester): officers define `fine_tiers` (JSON array of `{min_points, max_points|null, fine_amount, requirements}`) on the "Fines Settings" page. `ClearancePeriod::matchTier()` maps points to a tier (falls back to highest tier if points exceed all ranges).
+5. **Activating** (`ClearanceController::activate`) deletes this semester's **unpaid** clearance fines (fines with `event_id = NULL`) for the department, resets `users.is_cleared`, then creates one fine per student from their tier and auto-clears students with 0 points. Students who already **paid** this semester's clearance fine are skipped entirely, so paid records are never deleted. `deactivate` removes the unpaid ones. Fines with a non-null `event_id` are legacy per-event fines and are not touched.
+6. **Clearance**: officers manually set `users.is_cleared`; clearing is blocked while the student has `unpaid` fines from **any** semester (`User::hasUnpaidFines()`; whether old semesters should count is pending a client decision).
 
 **Surveys**: an event may `requires_survey`; `Survey` → `SurveyQuestion` → `SurveyResponse`, created by officers, answered by students.
 

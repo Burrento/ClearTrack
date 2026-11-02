@@ -1,4 +1,4 @@
-<?php
+hj<?php
 
 use Spatie\Permission\DefaultTeamResolver;
 use Spatie\Permission\Models\Permission;

@@ -9,9 +9,10 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'username', 'password', 'department_id', 'rfid_uid', 'year_level', 'is_cleared'])]
+#[Fillable(['name', 'username', 'password', 'department_id', 'rfid_uid', 'year_level', 'is_cleared', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -63,6 +64,18 @@ class User extends Authenticatable
     }
 
     /**
+     * Default student password: last name with a capital first letter + last 6 digits of the ID,
+     * e.g. "Juan Santos" / LGC25-105680 → Santos105680. "Dela Cruz, Juan" → Delacruz105680.
+     */
+    public static function defaultPassword(string $name, string $studentId): string
+    {
+        // ponytail: "Lastname, Firstname" or last word; officer sees the result in the flash message
+        $lastName = str_contains($name, ',') ? Str::before($name, ',') : Str::afterLast(trim($name), ' ');
+
+        return Str::ucfirst(Str::lower(preg_replace('/\s+/', '', $lastName))) . substr($studentId, -6);
+    }
+
+    /**
      * RFID serial key grouped for display, e.g. 04:A1:B2:C3. Stored without separators.
      */
     public function formattedRfid(): ?string
@@ -72,6 +85,8 @@ class User extends Authenticatable
 
     /**
      * Check if the student has unpaid fines.
+     * Includes unpaid fines from earlier semesters; add ->where('semester_id', Semester::current()?->id)
+     * here if previous semesters' fines should stop blocking clearance.
      */
     public function hasUnpaidFines(): bool
     {
@@ -97,19 +112,21 @@ class User extends Authenticatable
         }
 
         return ClearancePeriod::where('department_id', $this->department_id)
+            ->where('semester_id', Semester::current()?->id)
             ->where('status', 'active')
             ->latest()
             ->first();
     }
 
     /**
-     * Calculate total penalty points from all events where the student was absent.
+     * Calculate total penalty points from this semester's events where the student was absent.
      */
     public function getTotalPenaltyPoints(): int
     {
         return (int) Attendance::where('user_id', $this->id)
             ->where('status', 'absent')
             ->join('events', 'attendances.event_id', '=', 'events.id')
+            ->when(Semester::current(), fn ($q, $semester) => $q->where('events.start_time', '>=', $semester->starts_at))
             ->sum('events.penalty_points');
     }
 

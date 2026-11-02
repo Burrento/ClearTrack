@@ -24,7 +24,7 @@ class FineController extends Controller
                       $u->where('department_id', $departmentId);
                   });
             });
-        })->with(['user', 'event'])->orderBy('created_at', 'desc')->get();
+        })->with(['user', 'event', 'semester'])->orderBy('created_at', 'desc')->get();
 
         return view('fines.index', compact('fines'));
     }
@@ -46,6 +46,6 @@ class FineController extends Controller
 
         $fine->update(['status' => 'paid']);
 
-        return back()->with('status', 'Fine marked as paid.');
+        return back()->with('status', 'Payment recorded.');
     }
 }

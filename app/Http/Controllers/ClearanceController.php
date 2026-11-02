@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ClearancePeriod;
 use App\Models\User;
 use App\Models\Fine;
+use App\Models\Semester;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
@@ -52,12 +53,13 @@ class ClearanceController extends Controller
         } else {
             ClearancePeriod::create([
                 'department_id' => Auth::user()->department_id,
+                'semester_id' => Semester::current()?->id,
                 'status' => 'inactive',
                 'fine_tiers' => $tiers,
             ]);
         }
 
-        return back()->with('status', 'Fine tiers saved successfully.');
+        return back()->with('status', 'Tiers saved.');
     }
 
     /**
@@ -71,8 +73,9 @@ class ClearanceController extends Controller
             return back()->with('error', 'You must define fine tiers before processing fines.');
         }
 
-        // Recalculate fresh: drop previous clearance fines and cleared flags
-        $students = $this->departmentStudents()->get();
+        // Recalculate fresh: drop this semester's unpaid clearance fines and cleared flags.
+        // ponytail: students who already paid are left alone, even if their points rose since
+        $students = $this->departmentStudents()->whereNotIn('id', $this->paidStudentIds())->get();
         $this->resetClearance($students->pluck('id'));
 
         $fineCount = 0;
@@ -97,6 +100,7 @@ class ClearanceController extends Controller
             Fine::create([
                 'user_id' => $student->id,
                 'event_id' => null,
+                'semester_id' => Semester::current()?->id,
                 'amount' => $tier['fine_amount'],
                 'status' => 'unpaid',
                 'reason' => "Clearance Period — {$totalPoints} pts{$requirements}",
@@ -109,7 +113,7 @@ class ClearanceController extends Controller
             'activated_at' => now(),
         ]);
 
-        return back()->with('status', "Fines processed: {$fineCount} student(s) fined. Clearance is now active.");
+        return back()->with('status', "Clearance is open. {$fineCount} student(s) fined.");
     }
 
     /**
@@ -120,11 +124,11 @@ class ClearanceController extends Controller
         $clearance = $this->latestClearance();
 
         if ($clearance) {
-            $this->resetClearance($this->departmentStudents()->pluck('id'));
+            $this->resetClearance($this->departmentStudents()->whereNotIn('id', $this->paidStudentIds())->pluck('id'));
             $clearance->update(['status' => 'inactive']);
         }
 
-        return back()->with('status', 'Clearance has been reset. All clearance fines have been removed.');
+        return back()->with('status', 'Clearance closed. Unpaid clearance fines for this semester were removed.');
     }
 
     // ──────────────────────────────────────────────
@@ -159,7 +163,7 @@ class ClearanceController extends Controller
 
         $user->update(['is_cleared' => true]);
 
-        return back()->with('status', "{$user->name} has been marked as CLEARED.");
+        return back()->with('status', "{$user->name} marked cleared.");
     }
 
     /**
@@ -171,25 +175,43 @@ class ClearanceController extends Controller
 
         $user->update(['is_cleared' => false]);
 
-        return back()->with('status', "{$user->name} clearance has been revoked.");
+        return back()->with('status', "Clearance revoked for {$user->name}.");
     }
 
     private function latestClearance(): ?ClearancePeriod
     {
-        return ClearancePeriod::where('department_id', Auth::user()->department_id)->latest()->first();
+        return ClearancePeriod::where('department_id', Auth::user()->department_id)
+            ->where('semester_id', Semester::current()?->id)
+            ->latest()
+            ->first();
     }
 
     private function departmentStudents()
     {
-        return User::role('student')->where('department_id', Auth::user()->department_id);
+        return User::role('student')->where('department_id', Auth::user()->department_id)->where('is_active', true);
     }
 
     /**
-     * Remove clearance fines (fines with no event) and reset cleared status for the given students.
+     * Students who already paid a clearance fine this semester.
+     */
+    private function paidStudentIds()
+    {
+        return Fine::whereNull('event_id')
+            ->where('semester_id', Semester::current()?->id)
+            ->where('status', 'paid')
+            ->select('user_id');
+    }
+
+    /**
+     * Remove this semester's unpaid clearance fines (fines with no event) and reset cleared status for the given students.
      */
     private function resetClearance($studentIds): void
     {
-        Fine::whereIn('user_id', $studentIds)->whereNull('event_id')->delete();
+        Fine::whereIn('user_id', $studentIds)
+            ->whereNull('event_id')
+            ->where('semester_id', Semester::current()?->id)
+            ->where('status', 'unpaid')
+            ->delete();
         User::whereIn('id', $studentIds)->update(['is_cleared' => false]);
     }
 }

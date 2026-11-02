@@ -1,49 +1,47 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="bg-white shadow-sm sm:rounded-lg overflow-hidden">
-    <div class="p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold text-gray-800">Department Events</h1>
-            <a href="{{ route('events.create') }}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Create Event</a>
-        </div>
+<x-page-header title="Events and attendance" description="Students who miss an event get its penalty points once absences are processed.">
+    <a href="{{ route('events.create') }}" class="btn btn-primary">Create event</a>
+</x-page-header>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event Name</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Time</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Time</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Penalty Points</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    @forelse($events as $event)
-                        <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $event->name }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $event->start_time }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $event->end_time }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $event->penalty_points }} pts</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium flex space-x-3">
-                                <a href="{{ route('events.show', $event) }}" class="text-blue-600 hover:text-blue-900">View</a>
-                                <a href="{{ route('events.edit', $event) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
-                                <form action="{{ route('events.destroy', $event) }}" method="POST" onsubmit="return confirm('Are you sure?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
-                                </form>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">No events found for your department.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
+<div class="panel overflow-x-auto">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Event</th>
+                <th>When</th>
+                <th>Penalty</th>
+                <th>Status</th>
+                <th><span class="sr-only">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($events as $event)
+                <tr>
+                    <td><a href="{{ route('events.show', $event) }}" class="font-semibold hover:underline">{{ $event->name }}</a></td>
+                    <td class="whitespace-nowrap text-ink-soft">{{ $event->schedule() }}</td>
+                    <td class="whitespace-nowrap">{{ $event->penalty_points }} {{ \Illuminate\Support\Str::plural('pt', $event->penalty_points) }}</td>
+                    <td><x-event-phase :event="$event" /></td>
+                    <td>
+                        <div class="flex justify-end gap-4">
+                            <a href="{{ route('events.edit', $event) }}" class="action">Edit</a>
+                            <form action="{{ route('events.destroy', $event) }}" method="POST" onsubmit="return confirm('Delete {{ addslashes($event->name) }}? Its attendance records are deleted too.')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="action-danger">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="5" class="empty">
+                        No events yet. <a href="{{ route('events.create') }}" class="action">Create the first one</a> to start taking attendance.
+                    </td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
 </div>
 @endsection

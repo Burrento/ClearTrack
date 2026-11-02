@@ -2,6 +2,8 @@ erDiagram
     DEPARTMENTS ||--o{ USERS : "belongs to"
     DEPARTMENTS ||--o{ EVENTS : "organizes"
     DEPARTMENTS ||--o{ CLEARANCE_PERIODS : "manages"
+    SEMESTERS ||--o{ CLEARANCE_PERIODS : "scopes"
+    SEMESTERS ||--o{ FINES : "scopes"
     USERS ||--o{ ATTENDANCES : "records"
     USERS ||--o{ FINES : "incurs"
     USERS ||--o{ SURVEY_RESPONSES : "submits"
@@ -21,6 +23,7 @@ erDiagram
         string rfid_uid
         string year_level
         boolean is_cleared
+        boolean is_active
         string remember_token
         timestamps created_at_updated_at
     }
@@ -58,6 +61,7 @@ erDiagram
         bigint id PK
         bigint user_id FK
         bigint event_id FK "nullable"
+        bigint semester_id FK "nullable"
         decimal amount
         enum status
         text reason
@@ -67,9 +71,17 @@ erDiagram
     CLEARANCE_PERIODS {
         bigint id PK
         bigint department_id FK
+        bigint semester_id FK "nullable"
         enum status
         json fine_tiers
         timestamp activated_at
+        timestamps created_at_updated_at
+    }
+
+    SEMESTERS {
+        bigint id PK
+        string name
+        date starts_at
         timestamps created_at_updated_at
     }
 

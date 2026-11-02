@@ -1,49 +1,43 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-md mx-auto bg-white shadow-sm sm:rounded-lg overflow-hidden">
-    <div class="p-6">
-        <h1 class="text-2xl font-bold text-gray-800 mb-2">Upload Selfie</h1>
-        <p class="text-gray-600 mb-6">Event: <strong>{{ $event->name }}</strong></p>
+<div class="max-w-lg">
+    <x-page-header title="Send a selfie" :back="route('student.events')" back-label="My events"
+        :description="'For ' . $event->name . '. An officer checks it before you\'re marked present.'" />
 
-        <form action="{{ route('attendance.upload', $event) }}" method="POST" enctype="multipart/form-data">
-            @csrf
+    <form action="{{ route('attendance.upload', $event) }}" method="POST" enctype="multipart/form-data" class="panel panel-body">
+        @csrf
 
-            <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Take or select a photo</label>
-                <div class="flex items-center justify-center w-full">
-                    <label class="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                            <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                            <p class="mb-2 text-sm text-gray-500 font-semibold">Click to upload or take a photo</p>
-                            <p class="text-xs text-gray-500">PNG, JPG or JPEG (MAX. 2MB)</p>
-                        </div>
-                        <input type="file" name="photo" id="photo" class="hidden" accept="image/*" capture="user" required />
-                    </label>
-                </div>
-                @error('photo')
-                    <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                @enderror
-            </div>
+        <label for="photo" class="flex aspect-[4/3] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-rule bg-paper/50 text-center hover:border-seal focus-within:border-seal">
+            <img id="photo-preview" alt="Your selfie" class="hidden size-full object-cover">
+            <span id="photo-prompt" class="px-6">
+                <svg class="mx-auto size-10 text-ink-soft" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+                </svg>
+                <span class="mt-3 block font-semibold">Take a photo at the event</span>
+                <span class="mt-1 block text-sm text-ink-soft">Show your face and the venue. JPG or PNG, up to 2 MB.</span>
+            </span>
+            <input type="file" name="photo" id="photo" class="sr-only" accept="image/*" capture="user" required>
+        </label>
+        @error('photo')
+            <p class="field-error">{{ $message }}</p>
+        @enderror
 
-            <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition">
-                Submit Selfie
-            </button>
-        </form>
-
-        <div class="mt-6 border-t pt-4 text-center">
-            <a href="{{ route('student.events') }}" class="text-gray-500 hover:underline text-sm">Cancel</a>
-        </div>
-    </div>
+        <button type="submit" class="btn btn-primary btn-lg mt-6 w-full">Send selfie</button>
+    </form>
 </div>
-
-<script>
-    // Preview image (optional enhancement)
-    document.getElementById('photo').onchange = evt => {
-        const [file] = evt.target.files
-        if (file) {
-            // You could add a preview here if desired
-        }
-    }
-</script>
 @endsection
+
+@push('scripts')
+<script>
+    document.getElementById('photo').addEventListener('change', (e) => {
+        const [file] = e.target.files;
+        if (!file) return;
+        const preview = document.getElementById('photo-preview');
+        preview.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+        document.getElementById('photo-prompt').classList.add('hidden');
+    });
+</script>
+@endpush

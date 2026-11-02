@@ -1,44 +1,35 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-4xl mx-auto bg-white shadow-sm sm:rounded-lg overflow-hidden">
-    <div class="p-6">
-        <h1 class="text-2xl font-bold text-gray-800 mb-2">Verify Selfie Uploads</h1>
-        <p class="text-gray-600 mb-6">Event: <strong>{{ $event->name }}</strong></p>
+<x-page-header title="Review selfies" :back="route('events.show', $event)" :back-label="$event->name"
+    description="Approve a selfie to mark the student present. Rejecting marks them absent." />
 
-        @if($pendingAttendances->isEmpty())
-            <div class="text-center py-12">
-                <p class="text-gray-500 italic">No pending selfie uploads for this event.</p>
-                <a href="{{ route('events.show', $event) }}" class="text-blue-600 hover:underline mt-4 inline-block">Back to Event</a>
-            </div>
-        @else
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                @foreach($pendingAttendances as $attendance)
-                    <div class="border rounded-lg overflow-hidden flex flex-col">
-                        <img src="{{ asset('storage/' . $attendance->photo_path) }}" alt="Selfie" class="h-64 w-full object-cover">
-                        <div class="p-4 flex-grow">
-                            <h3 class="font-bold text-lg">{{ $attendance->user->name }}</h3>
-                            <p class="text-sm text-gray-500 mb-4">Uploaded at: {{ $attendance->updated_at }}</p>
-                            
-                            <div class="flex space-x-2">
-                                <form action="{{ route('attendance.approve', [$attendance, 'present']) }}" method="POST" class="flex-1">
-                                    @csrf
-                                    <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 rounded hover:bg-green-700 transition">
-                                        Approve
-                                    </button>
-                                </form>
-                                <form action="{{ route('attendance.approve', [$attendance, 'absent']) }}" method="POST" class="flex-1">
-                                    @csrf
-                                    <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 rounded hover:bg-red-700 transition">
-                                        Reject
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        @endif
+@if($pendingAttendances->isEmpty())
+    <div class="panel px-6 py-14 text-center">
+        <p class="text-lg font-semibold">No selfies waiting for review.</p>
+        <a href="{{ route('events.show', $event) }}" class="action mt-3 inline-block">Back to {{ $event->name }}</a>
     </div>
-</div>
+@else
+    <ul class="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        @foreach($pendingAttendances as $attendance)
+            <li class="panel overflow-hidden">
+                <img src="{{ asset('storage/' . $attendance->photo_path) }}" alt="Selfie from {{ $attendance->user->name }}" class="aspect-[4/3] w-full bg-paper object-cover">
+                <div class="p-5">
+                    <p class="text-lg font-bold">{{ $attendance->user->name }}</p>
+                    <p class="text-sm text-ink-soft">{{ $attendance->user->username }}, sent {{ $attendance->updated_at->format('g:i A') }}</p>
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <form action="{{ route('attendance.approve', [$attendance, 'absent']) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="btn btn-secondary w-full text-alarm">Reject</button>
+                        </form>
+                        <form action="{{ route('attendance.approve', [$attendance, 'present']) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="btn btn-primary w-full">Approve</button>
+                        </form>
+                    </div>
+                </div>
+            </li>
+        @endforeach
+    </ul>
+@endif
 @endsection

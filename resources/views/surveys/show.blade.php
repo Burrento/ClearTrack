@@ -1,32 +1,28 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-2xl mx-auto bg-white shadow-sm sm:rounded-lg overflow-hidden">
-    <div class="p-6">
-        <h1 class="text-2xl font-bold text-gray-800 mb-2">{{ $survey->title }}</h1>
-        <p class="text-gray-600 mb-6">{{ $survey->description }}</p>
+<div class="max-w-2xl">
+    <x-page-header :title="$survey->title" :back="route('student.events')" back-label="My events" :description="$survey->description" />
 
-        <form action="{{ route('surveys.show', $survey) }}" method="POST">
-            @csrf
+    <form action="{{ route('surveys.show', $survey) }}" method="POST" class="panel">
+        @csrf
+        <ol class="panel-body space-y-7">
+            @foreach($survey->questions as $question)
+                <li>
+                    <label for="q_{{ $question->id }}" class="label">
+                        <span class="text-ink-soft">{{ $loop->iteration }}.</span> {{ $question->question_text }}
+                    </label>
+                    <textarea name="answers[{{ $question->id }}]" id="q_{{ $question->id }}" rows="3" required class="input">{{ old('answers.' . $question->id) }}</textarea>
+                </li>
+            @endforeach
+        </ol>
+        @error('answers')
+            <p class="field-error px-6">{{ $message }}</p>
+        @enderror
 
-            <div class="space-y-6">
-                @foreach($survey->questions as $question)
-                    <div>
-                        <label for="q_{{ $question->id }}" class="block text-sm font-bold text-gray-700 mb-2">
-                            {{ $loop->iteration }}. {{ $question->question_text }}
-                        </label>
-                        <textarea name="answers[{{ $question->id }}]" id="q_{{ $question->id }}" rows="2" required
-                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
-                    </div>
-                @endforeach
-            </div>
-
-            <div class="mt-8 border-t pt-6 flex justify-end">
-                <button type="submit" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-md hover:bg-blue-700 transition">
-                    Submit Survey
-                </button>
-            </div>
-        </form>
-    </div>
+        <div class="flex justify-end border-t border-rule px-5 py-4 sm:px-6">
+            <button type="submit" class="btn btn-primary">Submit answers</button>
+        </div>
+    </form>
 </div>
 @endsection

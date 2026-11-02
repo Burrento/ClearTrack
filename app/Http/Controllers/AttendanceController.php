@@ -28,10 +28,15 @@ class AttendanceController extends Controller
 
         $user = User::where('rfid_uid', $validated['rfid_uid'])
             ->where('department_id', $event->department_id)
+            ->where('is_active', true)
             ->first();
 
         if (!$user) {
             return back()->withErrors(['rfid_uid' => 'Student not found or not in this department.']);
+        }
+
+        if (!$event->isOpenForAttendance()) {
+            return back()->withErrors(['rfid_uid' => 'Attendance is closed: the event is not running or absences were already processed.']);
         }
 
         Attendance::updateOrCreate(
@@ -39,7 +44,8 @@ class AttendanceController extends Controller
             ['status' => 'present', 'verified_by_id' => Auth::id()]
         );
 
-        return back()->with('status', "Attendance logged for {$user->name}.");
+        // Shown full-width on the scanner page rather than as the generic status flash
+        return back()->with('scanned', $user->name);
     }
 
     // Student Methods
@@ -55,14 +61,26 @@ class AttendanceController extends Controller
 
     public function uploadSelfieForm(Event $event): View
     {
+        $this->authorizeDepartment($event->department_id);
         return view('attendance.upload', compact('event'));
     }
 
     public function storeSelfie(Request $request, Event $event): RedirectResponse
     {
+        $this->authorizeDepartment($event->department_id);
+
         $request->validate([
             'photo' => 'required|image|max:2048',
         ]);
+
+        if (!$event->isOpenForAttendance()) {
+            return back()->withErrors(['photo' => 'Attendance is closed: the event is not running or absences were already processed.']);
+        }
+
+        $alreadyPresent = Attendance::where(['event_id' => $event->id, 'user_id' => Auth::id(), 'status' => 'present'])->exists();
+        if ($alreadyPresent) {
+            return back()->withErrors(['photo' => 'You are already marked present for this event.']);
+        }
 
         $path = $request->file('photo')->store('selfies', 'public');
 
@@ -71,7 +89,7 @@ class AttendanceController extends Controller
             ['status' => 'pending_verification', 'photo_path' => $path]
         );
 
-        return redirect()->route('student.events')->with('status', 'Selfie uploaded and pending verification.');
+        return redirect()->route('student.events')->with('status', 'Selfie sent. An officer will review it.');
     }
 
     // Officer Methods
@@ -100,6 +118,6 @@ class AttendanceController extends Controller
             'verified_by_id' => Auth::id()
         ]);
 
-        return back()->with('status', "Attendance marked as {$status}.");
+        return back()->with('status', $status === 'present' ? 'Selfie approved. Marked present.' : 'Selfie rejected. Marked absent.');
     }
 }

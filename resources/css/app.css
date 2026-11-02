@@ -5,7 +5,135 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
+/*
+ * ClearTrack, Luna Goco Colleges College of Nursing.
+ * Palette comes from the school seal and clinical paperwork: chart paper, seal green, ink.
+ * Atkinson Hyperlegible was designed for low-vision legibility; names must read at arm's length
+ * from the RFID table.
+ */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+
+    --color-paper: #eef3ef;
+    --color-surface: #ffffff;
+    --color-ink: #17301f;
+    --color-ink-soft: #4b5f53;
+    --color-rule: #d3ddd6;
+    --color-seal: #1e7b3a;
+    --color-seal-deep: #145a2a;
+    --color-seal-wash: #e3f1e6;
+    --color-alarm: #b42318;
+    --color-alarm-deep: #8f1c13;
+    --color-alarm-wash: #fce9e7;
+    --color-wait: #9a5a06;
+    --color-wait-wash: #fcf0d9;
+}
+
+@layer base {
+    body {
+        @apply bg-paper font-sans text-ink antialiased;
+        font-size: 1rem;
+        line-height: 1.55;
+        font-variant-numeric: tabular-nums;
+    }
+
+    h1, h2, h3 {
+        text-wrap: balance;
+    }
+
+    :focus-visible {
+        outline: 3px solid var(--color-seal);
+        outline-offset: 2px;
+    }
+}
+
+@layer components {
+    /* Buttons */
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[0.9375rem] leading-tight font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    }
+    .btn-primary { @apply bg-seal text-white hover:bg-seal-deep; }
+    .btn-secondary { @apply border border-rule bg-surface text-ink hover:border-ink-soft; }
+    .btn-danger { @apply bg-alarm text-white hover:bg-alarm-deep; }
+    .btn-sm { @apply px-3 py-1.5 text-sm; }
+    .btn-lg { @apply px-6 py-3.5 text-base; }
+
+    /* Text actions inside tables and lists */
+    .action { @apply font-semibold text-seal underline-offset-4 hover:underline; }
+    .action-danger { @apply font-semibold text-alarm underline-offset-4 hover:underline; }
+
+    /* Forms */
+    .label { @apply mb-1.5 block text-[0.9375rem] font-semibold text-ink; }
+    .hint { @apply mt-1.5 text-sm text-ink-soft; }
+    .field-error { @apply mt-1.5 text-sm font-semibold text-alarm; }
+    .input {
+        @apply block w-full rounded-lg border border-rule bg-surface px-3.5 py-2.5 text-base text-ink placeholder:text-ink-soft/60 focus:border-seal focus:ring-3 focus:ring-seal/20 focus:outline-none;
+    }
+    .input-invalid { @apply border-alarm; }
+    .checkbox { @apply size-5 rounded border-rule accent-seal; }
+
+    /* Surfaces: panels carry a rule line, not a shadow */
+    .panel { @apply rounded-xl border border-rule bg-surface; }
+    .panel-body { @apply p-5 sm:p-6; }
+    .panel-title { @apply text-xl font-bold text-ink; }
+
+    /* Data tables */
+    .data-table { @apply w-full text-left text-[0.9375rem]; }
+    /* relative keeps sr-only header text inside the scroll container instead of widening the page */
+    .data-table th { @apply relative border-b border-rule bg-paper/50 px-5 py-3 text-sm font-semibold whitespace-nowrap text-ink-soft; }
+    .data-table td { @apply border-b border-rule/70 px-5 py-3.5 align-middle; }
+    .data-table tbody tr:last-child td { @apply border-b-0; }
+    .data-table .empty { @apply px-5 py-12 text-center text-ink-soft; }
+
+    /* Status chips */
+    .badge { @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-sm font-semibold whitespace-nowrap; }
+    .badge-good { @apply bg-seal-wash text-seal-deep; }
+    .badge-bad { @apply bg-alarm-wash text-alarm; }
+    .badge-wait { @apply bg-wait-wash text-wait; }
+    .badge-muted { @apply border border-rule bg-paper text-ink-soft; }
+
+    /* Codes people read off cards and IDs */
+    .code { @apply font-mono tracking-wide; }
+
+    /*
+     * The clearance stamp: a rubber stamp, as on a paper clearance slip.
+     * The one bold element in the system; it presses in once.
+     */
+    .stamp {
+        display: inline-block;
+        padding: 0.3em 0.6em 0.25em;
+        border: 0.12em double currentColor;
+        border-radius: 0.18em;
+        /* Sized to its container (see .stamp-pad) so "Not cleared" fits on one line */
+        font-size: clamp(1.75rem, 10.5cqi, 4.25rem);
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        transform: rotate(-5deg);
+        /* Mostly solid ink with the occasional gap where the rubber didn't take */
+        mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -7 5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        animation: stamp-press 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+    }
+    .stamp-cleared { color: var(--color-seal); }
+    .stamp-not { color: var(--color-alarm); }
+    .stamp-waiting {
+        color: var(--color-ink-soft);
+        border-style: dashed;
+        border-width: 0.06em;
+        font-size: clamp(1.5rem, 7.5cqi, 2.75rem);
+    }
+    .stamp-pad { container-type: inline-size; }
+}
+
+@keyframes stamp-press {
+    from { opacity: 0; transform: rotate(-5deg) scale(1.35); }
+    55% { opacity: 1; }
+    to { opacity: 1; transform: rotate(-5deg) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .stamp { animation: none; }
 }

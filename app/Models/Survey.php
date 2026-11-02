@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['event_id', 'title', 'description'])]
 class Survey extends Model
 {
+    public function event()
+    {
+        return $this->belongsTo(Event::class);
+    }
+
     public function questions()
     {
         return $this->hasMany(SurveyQuestion::class);

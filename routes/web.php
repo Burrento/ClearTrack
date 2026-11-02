@@ -20,7 +20,7 @@ Route::get('/', function () {
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'showLoginForm'])->name('login');
-    Route::post('login', [AuthController::class, 'login']);
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 });
 
 Route::middleware('auth')->group(function () {
@@ -38,6 +38,9 @@ Route::middleware('auth')->group(function () {
         
         Route::get('students', [StudentController::class, 'index'])->name('students.index');
         Route::post('students', [StudentController::class, 'store'])->name('students.store');
+        Route::get('students/{user}/edit', [StudentController::class, 'edit'])->name('students.edit');
+        Route::put('students/{user}', [StudentController::class, 'update'])->name('students.update');
+        Route::post('students/{user}/toggle-active', [StudentController::class, 'toggleActive'])->name('students.toggleActive');
 
         Route::get('events/{event}/rfid', [AttendanceController::class, 'rfidScanner'])->name('attendance.rfid');
         Route::post('events/{event}/rfid', [AttendanceController::class, 'logRfid'])->name('attendance.logRfid');
@@ -70,6 +73,8 @@ Route::middleware('auth')->group(function () {
         Route::post('admin/departments', [AdminController::class, 'storeDepartment']);
         Route::get('admin/officers', [AdminController::class, 'officers'])->name('admin.officers');
         Route::post('admin/officers', [AdminController::class, 'storeOfficer']);
+        Route::get('admin/semesters', [AdminController::class, 'semesters'])->name('admin.semesters');
+        Route::post('admin/semesters', [AdminController::class, 'startSemester']);
     });
 
     Route::middleware('role:student')->group(function () {

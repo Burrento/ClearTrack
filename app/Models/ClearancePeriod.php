@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['department_id', 'status', 'fine_tiers', 'activated_at'])]
+#[Fillable(['department_id', 'semester_id', 'status', 'fine_tiers', 'activated_at'])]
 class ClearancePeriod extends Model
 {
     /**

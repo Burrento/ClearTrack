@@ -44,19 +44,23 @@ class SurveyController extends Controller
             ]);
         }
 
-        return redirect()->route('events.show', $event)->with('status', 'Survey created successfully.');
+        return redirect()->route('events.show', $event)->with('status', 'Survey attached.');
     }
 
     // Student Methods
     public function show(Survey $survey): View
     {
+        $this->authorizeDepartment($survey->event->department_id);
         return view('surveys.show', compact('survey'));
     }
 
     public function submit(Request $request, Survey $survey): RedirectResponse
     {
+        $this->authorizeDepartment($survey->event->department_id);
+
         $validated = $request->validate([
-            'answers' => 'required|array',
+            // array:<ids> rejects any key that isn't one of this survey's question IDs
+            'answers' => 'required|array:' . $survey->questions()->pluck('id')->implode(','),
             'answers.*' => 'required|string',
         ]);
 
@@ -67,6 +71,6 @@ class SurveyController extends Controller
             );
         }
 
-        return redirect()->route('student.events')->with('status', 'Survey submitted successfully.');
+        return redirect()->route('student.events')->with('status', 'Answers submitted.');
     }
 }

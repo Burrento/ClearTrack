@@ -41,7 +41,7 @@ class EventController extends Controller
         $validated['department_id'] = Auth::user()->department_id;
         Event::create($validated);
 
-        return redirect()->route('events.index')->with('status', 'Event created successfully.');
+        return redirect()->route('events.index')->with('status', 'Event created.');
     }
 
     /**
@@ -73,7 +73,7 @@ class EventController extends Controller
 
         $event->update($validated);
 
-        return redirect()->route('events.index')->with('status', 'Event updated successfully.');
+        return redirect()->route('events.index')->with('status', 'Changes saved.');
     }
 
     /**
@@ -84,7 +84,7 @@ class EventController extends Controller
         $this->authorizeDepartment($event->department_id);
         $event->delete();
 
-        return redirect()->route('events.index')->with('status', 'Event deleted successfully.');
+        return redirect()->route('events.index')->with('status', 'Event deleted.');
     }
 
     /**
@@ -107,7 +107,7 @@ class EventController extends Controller
 
         $absentCount = $event->markAbsentees();
 
-        return back()->with('status', "Absences processed: {$absentCount} student(s) marked absent. Penalty points ({$event->penalty_points} pts) will be added to their totals.");
+        return back()->with('status', "Absences processed. {$absentCount} student(s) marked absent and given {$event->penalty_points} penalty points.");
     }
 
     private function validateEvent(Request $request): array
