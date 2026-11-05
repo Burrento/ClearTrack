@@ -102,20 +102,90 @@ class EventController extends Controller
      * Opens the next session's time in right now instead of 1 hour before its start. Taps before
      * the start still count as on time; time out and the other sessions keep their usual windows.
      */
-    public function startEarly(Event $event): RedirectResponse
+    public function startSession(Event $event, EventSession $session): RedirectResponse
     {
-        $this->authorizeDepartment($event->department_id);
+        $this->authorizeSession($event, $session);
 
-        $session = $event->sessions->first(fn ($s) => $s->inOpensAt()->isFuture());
-
-        if ($event->fines_processed || $event->isOpenForAttendance() || !$session) {
-            return back()->with('error', 'Attendance is already open or this event has finished.');
+        if (!$session->canStartNow()) {
+            return back()->with('error', "{$session->label()} time in is already open or has finished.");
         }
 
         $session->update(['in_opens_at' => now()]);
 
         return redirect()->route('attendance.rfid', $event)->with('status',
             "{$session->label()} time in is open. Taps before {$session->starts_at->format('g:i A')} count as on time.");
+    }
+
+    /**
+     * Ends a running session now: time in closes and time out opens for the next 30 minutes.
+     */
+    public function endSession(Event $event, EventSession $session): RedirectResponse
+    {
+        $this->authorizeSession($event, $session);
+
+        if (!$session->canEndNow()) {
+            return back()->with('error', "{$session->label()} can only be ended while it's running (after its start, before time out).");
+        }
+
+        $session->update(['ends_at' => now()]);
+        $this->syncTimes($event);
+
+        return redirect()->route('attendance.rfid', $event)->with('status',
+            "{$session->label()} ended early. Time out is open until {$session->outClosesAt()->format('g:i A')}.");
+    }
+
+    /**
+     * Ends the whole event now: running sessions end (time out opens for 30 minutes), sessions
+     * that haven't started are cancelled, and sessions already in time out or over are left alone.
+     */
+    public function endEvent(Event $event): RedirectResponse
+    {
+        $this->authorizeDepartment($event->department_id);
+
+        $running = $event->sessions->filter->canEndNow();
+        $notStarted = $event->sessions->filter(fn ($s) => $s->starts_at->isFuture());
+
+        if ($event->fines_processed || ($running->isEmpty() && $notStarted->isEmpty())) {
+            return back()->with('error', 'There is nothing left to end in this event.');
+        }
+        $cancelled = $notStarted->reject(fn ($s) => $s->attendances()->exists());
+        if ($cancelled->count() === $event->sessions->count()) {
+            return back()->with('error', "This event hasn't started yet, so there is nothing to end. Delete it from the Events list instead.");
+        }
+
+        DB::transaction(function () use ($event, $running, $notStarted) {
+            $running->each->update(['ends_at' => now()]);
+            foreach ($notStarted as $session) {
+                // Someone already tapped into a session started early: end it rather than lose their taps
+                $session->attendances()->exists()
+                    ? $session->update(['starts_at' => now(), 'ends_at' => now()])
+                    : $session->delete();
+            }
+            $this->syncTimes($event);
+        });
+
+        $parts = $running->map(fn ($s) => "{$s->label()} time out is open until {$s->outClosesAt()->format('g:i A')}")
+            ->merge($notStarted->isEmpty() ? [] : [$notStarted->map->label()->implode(' and ') . ' cancelled']);
+
+        return redirect()->route('events.show', $event)->with('status', 'Event ended early. ' . $parts->implode('; ') . '.');
+    }
+
+    private function authorizeSession(Event $event, EventSession $session): void
+    {
+        $this->authorizeDepartment($event->department_id);
+        abort_unless($session->event_id === $event->id, 404);
+        abort_if($event->fines_processed, 403, 'Absences have already been processed for this event.');
+    }
+
+    /**
+     * Keeps the event's start/end spanning its sessions; Event::closesAt() and the scheduled
+     * absence processing read end_time.
+     */
+    private function syncTimes(Event $event): void
+    {
+        $sessions = $event->sessions()->get();
+        $event->update(['start_time' => $sessions->min('starts_at'), 'end_time' => $sessions->max('ends_at')]);
+        $event->unsetRelation('sessions');
     }
 
     public function processFines(Event $event): RedirectResponse

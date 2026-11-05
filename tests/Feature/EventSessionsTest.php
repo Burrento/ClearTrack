@@ -52,7 +52,7 @@ class EventSessionsTest extends TestCase
             'afternoon' => ['enabled' => '1', 'start' => '13:00', 'end' => '17:00'],
         ]))->assertSessionHasNoErrors();
 
-        return Event::sole();
+        return Event::latest('id')->first();
     }
 
     private function tapAt(Event $event, string $time, ?User $student = null)
@@ -146,35 +146,98 @@ class EventSessionsTest extends TestCase
         $this->assertSame('absent', $this->row($event, 'afternoon')->status);
     }
 
-    public function test_officer_starts_attendance_early(): void
+    private function sessionOf(Event $event, string $name)
+    {
+        return $event->sessions()->where('name', $name)->first();
+    }
+
+    public function test_officer_starts_any_session_early(): void
     {
         $event = $this->dayEvent();
 
         $this->tapAt($event, '06:00')->assertStatus(422); // usually opens at 7:00
-        $this->actingAs($this->officer)->get(route('events.show', $event))->assertSee('Start attendance now');
+        $this->actingAs($this->officer)->get(route('events.show', $event))->assertSee('Start now');
 
-        $this->post(route('events.startEarly', $event))->assertRedirect(route('attendance.rfid', $event));
-        $this->assertSame('06:00', $event->sessions()->where('name', 'morning')->value('in_opens_at')->format('H:i'));
-        $this->assertNull($event->sessions()->where('name', 'afternoon')->value('in_opens_at'));
+        $this->post(route('events.sessions.start', [$event, $this->sessionOf($event, 'morning')]))->assertRedirect(route('attendance.rfid', $event));
+        $this->assertSame('06:00', $this->sessionOf($event, 'morning')->in_opens_at->format('H:i'));
+        $this->assertNull($this->sessionOf($event, 'afternoon')->in_opens_at);
         $this->assertSame('live', $event->fresh()->phase());
 
         $this->tapAt($event, '06:05')->assertJson(['action' => 'in', 'status' => 'present', 'session' => 'Morning']);
         $this->tapAt($event, '11:40')->assertJson(['action' => 'out']); // time out unchanged
+
+        // The afternoon can be started early on its own (it usually opens at 12:00)
+        $this->travelTo($this->day->copy()->setTime(11, 45));
+        $this->post(route('events.sessions.start', [$event, $this->sessionOf($event, 'afternoon')]));
+        $this->assertSame('11:45', $this->sessionOf($event, 'afternoon')->in_opens_at->format('H:i'));
     }
 
-    public function test_starting_early_is_refused_for_other_departments_and_finished_events(): void
+    public function test_officer_ends_a_session_early(): void
     {
         $event = $this->dayEvent();
+        $morning = $this->sessionOf($event, 'morning');
+
+        $this->tapAt($event, '07:30');
+        $this->post(route('events.sessions.end', [$event, $morning]))->assertSessionHas('error'); // not started yet
+
+        $this->tapAt($event, '08:05');
+        $this->travelTo($this->day->copy()->setTime(10, 0));
+        $this->actingAs($this->officer)->post(route('events.sessions.end', [$event, $morning]))
+            ->assertRedirect(route('attendance.rfid', $event))
+            ->assertSessionHas('status', fn ($s) => str_contains($s, 'Time out is open until 10:30 AM'));
+
+        $this->assertSame('10:00', $morning->fresh()->ends_at->format('H:i'));
+        $this->assertSame('17:00', $event->fresh()->end_time->format('H:i')); // afternoon still to come
+        $this->tapAt($event, '10:05')->assertJson(['action' => 'out', 'session' => 'Morning']);
+        $this->tapAt($event, '10:35')->assertStatus(422); // morning over, afternoon not open until 12:00
+    }
+
+    public function test_officer_ends_the_whole_event_early(): void
+    {
+        $event = $this->dayEvent();
+        $this->tapAt($event, '07:55');
+
+        $this->travelTo($this->day->copy()->setTime(10, 0));
+        $this->actingAs($this->officer)->post(route('events.end', $event))
+            ->assertSessionHas('status', fn ($s) => str_contains($s, 'Morning time out is open until 10:30 AM') && str_contains($s, 'Afternoon cancelled'));
+
+        $event = $event->fresh();
+        $this->assertSame(['morning'], $event->sessions->pluck('name')->all());
+        $this->assertSame('10:00', $event->end_time->format('H:i'));
+
+        $this->tapAt($event, '10:10')->assertJson(['action' => 'out']);
+        $this->travelTo($this->day->copy()->setTime(10, 31));
+        $this->post(route('events.processFines', $event))->assertSessionHas('status');
+        $this->assertSame(0, \App\Models\Fine::count()); // tapped in and out of the only remaining session
+    }
+
+    public function test_ending_an_event_that_has_not_started_is_refused(): void
+    {
+        $event = $this->dayEvent();
+
+        $this->travelTo($this->day->copy()->setTime(6, 0));
+        $this->actingAs($this->officer)->post(route('events.end', $event))->assertSessionHas('error');
+        $this->assertCount(2, $event->fresh()->sessions);
+    }
+
+    public function test_early_start_and_end_are_refused_for_other_departments_events_and_finished_events(): void
+    {
+        $event = $this->dayEvent();
+        $other = $this->dayEvent(); // a second event, for the session-belongs-to-event check
         $soaOfficer = User::create(['name' => 'SOA Officer', 'username' => 'soa_officer', 'password' => 'x',
             'department_id' => \App\Models\Department::where('code', 'SOA')->value('id')]);
         $soaOfficer->assignRole('officer');
 
         $this->travelTo($this->day->copy()->setTime(6, 0));
-        $this->actingAs($soaOfficer)->post(route('events.startEarly', $event))->assertForbidden();
+        $this->actingAs($soaOfficer)->post(route('events.sessions.start', [$event, $this->sessionOf($event, 'morning')]))->assertForbidden();
+        $this->actingAs($soaOfficer)->post(route('events.end', $event))->assertForbidden();
+
+        $this->actingAs($this->officer)->post(route('events.sessions.start', [$event, $this->sessionOf($other, 'morning')]))->assertNotFound();
 
         $event->update(['fines_processed' => true]);
-        $this->actingAs($this->officer)->post(route('events.startEarly', $event))->assertSessionHas('error');
-        $this->assertNull($event->sessions()->where('name', 'morning')->value('in_opens_at'));
+        $this->post(route('events.sessions.start', [$event, $this->sessionOf($event, 'morning')]))->assertForbidden();
+        $this->post(route('events.end', $event))->assertSessionHas('error');
+        $this->assertNull($this->sessionOf($event, 'morning')->in_opens_at);
     }
 
     public function test_cannot_process_before_last_time_out_closes(): void

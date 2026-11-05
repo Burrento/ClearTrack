@@ -80,6 +80,36 @@ class EventSession extends Model
     }
 
     /**
+     * Time in hasn't opened yet, so an officer can open it now.
+     */
+    public function canStartNow(): bool
+    {
+        return $this->inOpensAt()->isFuture();
+    }
+
+    /**
+     * Running (time in open, past its start), so an officer can end it now: its end becomes now,
+     * which closes time in and opens time out for OUT_WINDOW_MINUTES.
+     */
+    public function canEndNow(): bool
+    {
+        return $this->isInOpen() && $this->starts_at->isPast();
+    }
+
+    /**
+     * upcoming, in (time in open), out (time out open) or ended
+     */
+    public function state(): string
+    {
+        return match (true) {
+            $this->isOutOpen() => 'out',
+            $this->isInOpen() => 'in',
+            $this->canStartNow() => 'upcoming',
+            default => 'ended',
+        };
+    }
+
+    /**
      * "8:00 AM – 12:00 PM"
      */
     public function times(): string

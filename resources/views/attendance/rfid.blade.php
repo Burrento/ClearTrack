@@ -52,6 +52,14 @@
                 (<span data-count="{{ $session->name }}-late">{{ $c['late'] }}</span> late),
                 <strong data-count="{{ $session->name }}-out">{{ $c['out'] }}</strong> out
             </p>
+            @if($session->canEndNow() && !$event->fines_processed)
+                {{-- A normal form post: the page reloads into the time-out window --}}
+                <form action="{{ route('events.sessions.end', [$event, $session]) }}" method="POST" class="mt-2"
+                    onsubmit="return confirm(@js('End ' . strtolower($session->label()) . ' now? Time in closes, and time out opens for the next 30 minutes.'))">
+                    @csrf
+                    <button type="submit" class="btn btn-secondary btn-sm">End {{ strtolower($session->label()) }} now</button>
+                </form>
+            @endif
         </li>
     @endforeach
 </ul>

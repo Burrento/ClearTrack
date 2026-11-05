@@ -21,17 +21,14 @@
 </div>
 
 {{-- Actions, in the order an officer uses them --}}
-<section class="panel panel-body mb-10" aria-label="Event actions">
+@php
+    $open = !$event->fines_processed;
+    $endable = $open && $event->sessions->contains(fn ($s) => $s->canEndNow() || $s->starts_at->isFuture());
+@endphp
+<section class="panel panel-body mb-6" aria-label="Event actions">
     <div class="flex flex-wrap gap-3">
-        @php $nextToOpen = $event->sessions->first(fn ($s) => $s->inOpensAt()->isFuture()); @endphp
         @if($event->isOpenForAttendance())
             <a href="{{ route('attendance.rfid', $event) }}" class="btn btn-primary btn-lg">Open RFID scanner</a>
-        @elseif(!$event->fines_processed && $nextToOpen)
-            <form action="{{ route('events.startEarly', $event) }}" method="POST"
-                onsubmit="return confirm(@js('Start ' . strtolower($nextToOpen->label()) . ' attendance now? Time in opens immediately instead of at ' . $nextToOpen->inOpensAt()->format('g:i A') . '. Taps before ' . $nextToOpen->starts_at->format('g:i A') . ' count as on time.'))">
-                @csrf
-                <button type="submit" class="btn btn-primary btn-lg">Start attendance now</button>
-            </form>
         @endif
 
         @if($event->survey)
@@ -40,19 +37,25 @@
             <a href="{{ route('surveys.create', $event) }}" class="btn btn-secondary btn-lg">Attach survey</a>
         @endif
 
-        @unless($event->fines_processed)
-            <form action="{{ route('events.processFines', $event) }}" method="POST" class="sm:ml-auto"
-                onsubmit="return confirm('Process absences now? Students who missed a session, came late or missed a time in or time out get this event\'s fines.')">
-                @csrf
-                <button type="submit" class="btn btn-danger btn-lg" @disabled($event->closesAt()->isFuture())>Process absences</button>
-            </form>
-        @endunless
+        @if($open)
+            <div class="flex flex-wrap gap-3 sm:ml-auto">
+                @if($endable)
+                    <form action="{{ route('events.end', $event) }}" method="POST"
+                        onsubmit="return confirm('End the whole event now? Running sessions close time in and open time out for 30 minutes. Sessions that have not started yet are cancelled.')">
+                        @csrf
+                        <button type="submit" class="btn btn-secondary btn-lg">End event now</button>
+                    </form>
+                @endif
+                <form action="{{ route('events.processFines', $event) }}" method="POST"
+                    onsubmit="return confirm('Process absences now? Students who missed a session, came late or missed a time in or time out get this event\'s fines.')">
+                    @csrf
+                    <button type="submit" class="btn btn-danger btn-lg" @disabled($event->closesAt()->isFuture())>Process absences</button>
+                </form>
+            </div>
+        @endif
     </div>
-    @if(!$event->fines_processed && !$event->isOpenForAttendance() && $nextToOpen)
-        <p class="hint mt-4">{{ $nextToOpen->label() }} time in normally opens at {{ $nextToOpen->inOpensAt()->format('g:i A') }}{{ $nextToOpen->inOpensAt()->isToday() ? '' : ' on ' . $nextToOpen->inOpensAt()->format('M j') }}. Start it now if students arrive early.</p>
-    @endif
-    @if(!$event->fines_processed)
-        <p class="hint mt-2">
+    @if($open)
+        <p class="hint mt-4">
             @if($event->closesAt()->isFuture())
                 Absences can be processed after the last time out closes at {{ $event->closesAt()->format('g:i A') }}.
             @else
@@ -60,6 +63,46 @@
             @endif
         </p>
     @endif
+</section>
+
+{{-- Each session: its state, and starting or ending it early --}}
+<section class="mb-10" aria-labelledby="sessions-heading">
+    <h2 id="sessions-heading" class="panel-title mb-4">Sessions</h2>
+    <ul class="panel divide-y divide-rule">
+        @foreach($event->sessions as $session)
+            <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                <div>
+                    <p class="font-semibold">{{ $session->label() }} <span class="font-normal text-ink-soft">{{ $session->times() }}</span></p>
+                    <p class="text-sm text-ink-soft">
+                        @switch($session->state())
+                            @case('upcoming') Time in opens {{ $session->inOpensAt()->format($session->inOpensAt()->isToday() ? 'g:i A' : 'M j, g:i A') }} @break
+                            @case('in') <span class="font-semibold text-seal-deep">Time in open</span>{{ $session->starts_at->isFuture() ? ', late after ' . $session->starts_at->format('g:i A') : ', taps now are late' }} @break
+                            @case('out') <span class="font-semibold text-seal-deep">Time out open</span> until {{ $session->outClosesAt()->format('g:i A') }} @break
+                            @default Ended
+                        @endswitch
+                    </p>
+                </div>
+                @if($open)
+                    <div class="flex gap-2">
+                        @if($session->canStartNow())
+                            <form action="{{ route('events.sessions.start', [$event, $session]) }}" method="POST"
+                                onsubmit="return confirm(@js('Start ' . strtolower($session->label()) . ' attendance now? Time in opens immediately instead of at ' . $session->inOpensAt()->format('g:i A') . '. Taps before ' . $session->starts_at->format('g:i A') . ' count as on time.'))">
+                                @csrf
+                                <button type="submit" class="btn btn-secondary btn-sm">Start now</button>
+                            </form>
+                        @endif
+                        @if($session->canEndNow())
+                            <form action="{{ route('events.sessions.end', [$event, $session]) }}" method="POST"
+                                onsubmit="return confirm(@js('End ' . strtolower($session->label()) . ' now? Time in closes, and time out opens for the next 30 minutes.'))">
+                                @csrf
+                                <button type="submit" class="btn btn-secondary btn-sm">End now</button>
+                            </form>
+                        @endif
+                    </div>
+                @endif
+            </li>
+        @endforeach
+    </ul>
 </section>
 
 <section aria-labelledby="log-heading">

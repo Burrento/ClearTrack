@@ -55,7 +55,9 @@ Route::middleware('auth')->group(function () {
         Route::post('fines/{fine}/pay', [FineController::class, 'markAsPaid'])->name('fines.markAsPaid');
 
         Route::post('events/{event}/process-fines', [EventController::class, 'processFines'])->name('events.processFines');
-        Route::post('events/{event}/start-early', [EventController::class, 'startEarly'])->name('events.startEarly');
+        Route::post('events/{event}/sessions/{session}/start', [EventController::class, 'startSession'])->name('events.sessions.start');
+        Route::post('events/{event}/sessions/{session}/end', [EventController::class, 'endSession'])->name('events.sessions.end');
+        Route::post('events/{event}/end', [EventController::class, 'endEvent'])->name('events.end');
 
         // Clearance is automatic (no unpaid fines); this lists who is cleared and who still owes
         Route::get('clearance', [ClearanceController::class, 'index'])->name('clearance.index');
