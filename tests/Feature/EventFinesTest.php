@@ -56,7 +56,7 @@ class EventFinesTest extends TestCase
             'end_time' => now()->addDay()->addHours(2)->format('Y-m-d\TH:i'),
             'absent_fine' => '50',
             'late_fine' => '20.50',
-        ])->assertSessionHasNoErrors();
+        ])->assertSessionHasNoErrors()->assertRedirect(route('events.index'));
 
         $event = Event::sole();
         $this->assertSame('50.00', $event->absent_fine);
