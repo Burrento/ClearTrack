@@ -12,6 +12,9 @@ concurrency: deploy
 jobs:
   test:
     runs-on: ubuntu-24.04
+    env:
+      # The runner's Xdebug breaks Laravel's date validation ("after:start_time"); the server has no Xdebug
+      XDEBUG_MODE: "off"
     steps:
       - uses: actions/checkout@v4
       - run: composer install --no-interaction --no-progress
