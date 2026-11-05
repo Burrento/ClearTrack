@@ -6,8 +6,10 @@
     $activeCount = $students->where('is_active', true)->count();
 @endphp
 
-<div x-data="{ search: '', yearFilter: '' }" x-init="@if($errors->any()) $refs.register.showModal() @endif">
+<div x-data="{ search: '', yearFilter: '' }"
+    x-init="@if($errors->has('csv')) $refs.import.showModal() @elseif($errors->any()) $refs.register.showModal() @endif">
     <x-page-header title="Students" :description="$activeCount . ' active ' . \Illuminate\Support\Str::plural('student', $activeCount) . ' in ' . Auth::user()->department->code . '.'">
+        <button type="button" @click="$refs.import.showModal()" class="btn btn-secondary">Import CSV</button>
         <button type="button" @click="$refs.register.showModal()" class="btn btn-primary">Register student</button>
     </x-page-header>
 
@@ -136,6 +138,53 @@
             <div class="flex flex-col-reverse gap-3 border-t border-rule bg-paper/50 px-6 py-4 sm:flex-row sm:justify-end">
                 <button type="button" @click="$refs.register.close()" class="btn btn-secondary">Cancel</button>
                 <button type="submit" class="btn btn-primary">Register student</button>
+            </div>
+        </form>
+    </dialog>
+
+    {{-- Import students from a CSV --}}
+    <dialog x-ref="import"
+        class="m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl border border-rule bg-surface p-0 text-ink shadow-2xl backdrop:bg-ink/60">
+        <form method="POST" action="{{ route('students.import') }}" enctype="multipart/form-data">
+            @csrf
+            <div class="p-6">
+                <h2 class="text-2xl font-bold">Import students</h2>
+                <p class="mt-1 text-ink-soft">Register many students at once into {{ Auth::user()->department->code }} from a spreadsheet.</p>
+
+                <ol class="mt-5 list-decimal space-y-2 pl-5">
+                    <li><a href="{{ route('students.importTemplate') }}" class="action">Download the template</a>, then open it in Excel or Google Sheets.</li>
+                    <li>Add one student per row:
+                        <ul class="mt-1 list-disc space-y-0.5 pl-5 text-ink-soft">
+                            <li><strong class="text-ink">name</strong>: e.g. <span class="code">Dela Cruz, Juan</span> (last name first with a comma for two-word last names)</li>
+                            <li><strong class="text-ink">student_id</strong>: e.g. <span class="code">LGC25-105680</span></li>
+                            <li><strong class="text-ink">year_level</strong>: First Year, Second Year, Third Year, Fourth Year or Fifth Year</li>
+                            <li><strong class="text-ink">rfid</strong>: optional; leave empty and tap cards later with Edit</li>
+                        </ul>
+                    </li>
+                    <li>Save as <strong>CSV</strong> and upload it here.</li>
+                </ol>
+
+                <div class="mt-5">
+                    <label for="csv" class="label">CSV file</label>
+                    <input id="csv" type="file" name="csv" accept=".csv,text/csv" required
+                        class="block w-full text-sm file:mr-3 file:rounded-lg file:border file:border-rule file:bg-surface file:px-3 file:py-2 file:font-semibold file:text-ink hover:file:border-ink-soft">
+                    @error('csv')
+                        <div class="mt-3 rounded-lg border border-alarm/30 bg-alarm-wash px-4 py-3 text-alarm" role="alert">
+                            <p class="font-semibold">{{ $message }}</p>
+                            @if(session('csv_problems'))
+                                <ul class="mt-2 max-h-48 list-disc space-y-1 overflow-y-auto pl-5 text-sm">
+                                    @foreach(session('csv_problems') as $problem) <li>{{ $problem }}</li> @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    @enderror
+                </div>
+                <p class="hint">Students already registered are skipped. Each new student's password is their last name plus the last 6 digits of their ID.</p>
+            </div>
+
+            <div class="flex flex-col-reverse gap-3 border-t border-rule bg-paper/50 px-6 py-4 sm:flex-row sm:justify-end">
+                <button type="button" @click="$refs.import.close()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Import students</button>
             </div>
         </form>
     </dialog>

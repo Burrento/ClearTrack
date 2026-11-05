@@ -1,0 +1,97 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Department;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
+use Tests\TestCase;
+
+class StudentImportTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $officer;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->artisan('db:seed', ['--class' => 'RolesAndPermissionsSeeder']);
+        $this->officer = User::role('officer')->first();
+    }
+
+    private function upload(string $csv)
+    {
+        return $this->actingAs($this->officer)->post(route('students.import'), [
+            'csv' => UploadedFile::fake()->createWithContent('students.csv', $csv),
+        ]);
+    }
+
+    public function test_template_has_the_headers(): void
+    {
+        $response = $this->actingAs($this->officer)->get(route('students.importTemplate'))->assertOk();
+
+        $this->assertSame("\u{FEFF}name,student_id,year_level,rfid\r\n", $response->streamedContent());
+        $this->assertStringContainsString('attachment; filename=cleartrack-students-template.csv', $response->headers->get('Content-Disposition'));
+    }
+
+    public function test_imports_students_into_the_officers_department(): void
+    {
+        // Excel-style: BOM, capitalised headers, quoted name with a comma, lowercase ID and year, blank line
+        $csv = "\u{FEFF}Name,Student_ID,Year_Level,RFID\r\n"
+            . "\"Dela Cruz, Juan\",lgc25-200001,second year,04:a1:b2:c3\r\n"
+            . "\r\n"
+            . "Maria Santos,LGC25-200002,Fourth Year,\r\n"
+            . "Test Student,LGC25-105680,First Year,\r\n"; // already registered by the seeder
+
+        $this->upload($csv)->assertRedirect(route('students.index'))
+            ->assertSessionHas('status', fn ($s) => str_contains($s, '2 students imported. 1 already registered, so skipped.'));
+
+        $juan = User::where('username', 'LGC25-200001')->sole();
+        $this->assertSame('Dela Cruz, Juan', $juan->name);
+        $this->assertSame('Second Year', $juan->year_level);
+        $this->assertSame('04A1B2C3', $juan->rfid_uid);
+        $this->assertSame($this->officer->department_id, $juan->department_id);
+        $this->assertTrue($juan->hasRole('student'));
+        $this->assertTrue(Hash::check('Delacruz200001', $juan->password));
+        $this->assertNull(User::where('username', 'LGC25-200002')->value('rfid_uid'));
+    }
+
+    public function test_any_bad_row_imports_nothing_and_lists_the_problems(): void
+    {
+        $csv = "name,student_id,year_level,rfid\n"
+            . "Good Student,LGC25-300001,First Year,\n"
+            . ",LGC25-300002,First Year,\n"
+            . "Bad Id,12345,First Year,\n"
+            . "Bad Year,LGC25-300003,Freshman,\n"
+            . "Twin,LGC25-300001,First Year,\n";
+
+        $this->upload($csv)->assertSessionHasErrors('csv')
+            ->assertSessionHas('csv_problems', fn ($p) => count($p) === 4
+                && str_starts_with($p[0], 'Line 3: name is empty')
+                && str_contains($p[1], 'Line 4: student ID "12345"')
+                && str_contains($p[2], 'year level "Freshman"')
+                && str_contains($p[3], 'also on line 2'));
+
+        $this->assertSame(0, User::where('username', 'like', 'LGC25-3%')->count());
+    }
+
+    public function test_missing_columns_and_card_conflicts_are_rejected(): void
+    {
+        $this->upload("name,id\nJuan,LGC25-400001\n")->assertSessionHasErrors('csv');
+
+        $taken = User::role('student')->first()->rfid_uid;
+        $this->upload("name,student_id,year_level,rfid\nJuan,LGC25-400001,First Year,{$taken}\n")
+            ->assertSessionHas('csv_problems', fn ($p) => str_contains($p[0], 'already registered to another student'));
+        $this->assertNull(User::where('username', 'LGC25-400001')->first());
+    }
+
+    public function test_only_officers_can_import(): void
+    {
+        $student = User::role('student')->first();
+        $this->actingAs($student)->get(route('students.importTemplate'))->assertForbidden();
+        $this->actingAs($student)->post(route('students.import'))->assertForbidden();
+    }
+}

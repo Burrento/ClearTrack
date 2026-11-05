@@ -38,6 +38,8 @@ Route::middleware('auth')->group(function () {
         
         Route::get('students', [StudentController::class, 'index'])->name('students.index');
         Route::post('students', [StudentController::class, 'store'])->name('students.store');
+        Route::get('students/import/template', [StudentController::class, 'importTemplate'])->name('students.importTemplate');
+        Route::post('students/import', [StudentController::class, 'import'])->name('students.import');
         Route::get('students/{user}/edit', [StudentController::class, 'edit'])->name('students.edit');
         Route::put('students/{user}', [StudentController::class, 'update'])->name('students.update');
         Route::post('students/{user}/toggle-active', [StudentController::class, 'toggleActive'])->name('students.toggleActive');
