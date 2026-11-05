@@ -5,6 +5,8 @@ name: Test and deploy
 on:
   push:
     branches: [main]
+  # "Run workflow" button on the Actions tab, for when GitHub drops a push event
+  workflow_dispatch:
 
 # A newer push waits for the running deploy instead of overlapping it
 concurrency: deploy
