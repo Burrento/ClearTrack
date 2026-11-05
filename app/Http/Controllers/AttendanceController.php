@@ -39,13 +39,19 @@ class AttendanceController extends Controller
             return back()->withErrors(['rfid_uid' => 'Attendance is closed: the event is not running or absences were already processed.']);
         }
 
-        Attendance::updateOrCreate(
+        // First tap wins: tapping again later must not turn "present" into "late"
+        $attendance = Attendance::firstOrCreate(
             ['event_id' => $event->id, 'user_id' => $user->id],
-            ['status' => 'present', 'verified_by_id' => Auth::id()]
+            ['status' => $event->tapStatus(), 'verified_by_id' => Auth::id()]
         );
 
         // Shown full-width on the scanner page rather than as the generic status flash
-        return back()->with('scanned', $user->name);
+        return back()->with('scanned', [
+            'name' => $user->name,
+            'status' => $attendance->status,
+            'repeat' => !$attendance->wasRecentlyCreated,
+            'at' => $attendance->created_at->format('g:i:s A'),
+        ]);
     }
 
     // Student Methods

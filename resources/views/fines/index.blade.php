@@ -46,7 +46,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="5" class="empty">No fines yet. Fines are created when you process clearance on the Fine tiers page.</td></tr>
+                <tr><td colspan="5" class="empty">No fines yet. Fines are added for absent and late students when an event's absences are processed.</td></tr>
             @endforelse
         </tbody>
     </table>

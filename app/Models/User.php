@@ -12,7 +12,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'username', 'password', 'department_id', 'rfid_uid', 'year_level', 'is_cleared', 'is_active'])]
+#[Fillable(['name', 'username', 'password', 'department_id', 'rfid_uid', 'year_level', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -52,15 +52,11 @@ class User extends Authenticatable
     }
 
     /**
-     * Determine if the user is cleared (manually set by officer).
+     * A student is cleared once every fine is paid; there is no separate clearance step.
      */
     public function isCleared(): bool
     {
-        if (!$this->hasRole('student')) {
-            return true;
-        }
-
-        return (bool) $this->is_cleared;
+        return !$this->hasRole('student') || !$this->hasUnpaidFines();
     }
 
     /**
@@ -90,59 +86,15 @@ class User extends Authenticatable
      */
     public function hasUnpaidFines(): bool
     {
-        return $this->fines()->where('status', 'unpaid')->count() > 0;
+        return $this->fines()->where('status', 'unpaid')->exists();
     }
 
     /**
-     * Check if there is an active clearance period for the student's department.
+     * Adds unpaid_total (sum of unpaid fines, null when none) to each student in a list, without a query per row.
      */
-    public function isClearanceActive(): bool
+    public function scopeWithUnpaidTotal($query)
     {
-        $clearance = $this->getActiveClearancePeriod();
-        return $clearance !== null && $clearance->isActive();
-    }
-
-    /**
-     * Get the active clearance period for the student's department.
-     */
-    public function getActiveClearancePeriod(): ?ClearancePeriod
-    {
-        if (!$this->department_id) {
-            return null;
-        }
-
-        return ClearancePeriod::where('department_id', $this->department_id)
-            ->where('semester_id', Semester::current()?->id)
-            ->where('status', 'active')
-            ->latest()
-            ->first();
-    }
-
-    /**
-     * Calculate total penalty points from this semester's events where the student was absent.
-     */
-    public function getTotalPenaltyPoints(): int
-    {
-        return (int) Attendance::where('user_id', $this->id)
-            ->where('status', 'absent')
-            ->join('events', 'attendances.event_id', '=', 'events.id')
-            ->when(Semester::current(), fn ($q, $semester) => $q->where('events.start_time', '>=', $semester->starts_at))
-            ->sum('events.penalty_points');
-    }
-
-    /**
-     * Get the matched fine tier for this student based on their accumulated points.
-     * Returns null if no active clearance period or no matching tier.
-     */
-    public function getMatchedTier(): ?array
-    {
-        $clearance = $this->getActiveClearancePeriod();
-
-        if (!$clearance) {
-            return null;
-        }
-
-        return $clearance->matchTier($this->getTotalPenaltyPoints());
+        return $query->withSum(['fines as unpaid_total' => fn ($q) => $q->where('status', 'unpaid')], 'amount');
     }
 
     /**

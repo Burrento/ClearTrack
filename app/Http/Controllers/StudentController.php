@@ -17,13 +17,10 @@ class StudentController extends Controller
         $students = User::role('student')
             ->where('department_id', auth()->user()->department_id)
             ->with('department')
+            ->withUnpaidTotal()
             ->get();
 
-        $clearanceActive = \App\Models\ClearancePeriod::where('department_id', auth()->user()->department_id)
-            ->where('status', 'active')
-            ->exists();
-            
-        return view('officer.students.index', compact('students', 'clearanceActive'));
+        return view('officer.students.index', compact('students'));
     }
 
     public function store(Request $request): RedirectResponse

@@ -60,14 +60,10 @@
                         <td>
                             @if(!$student->is_active)
                                 <x-badge tone="muted">Deactivated</x-badge>
-                            @elseif($clearanceActive)
-                                @if($student->isCleared())
-                                    <x-badge tone="good">Cleared</x-badge>
-                                @else
-                                    <x-badge tone="bad">Not cleared</x-badge>
-                                @endif
+                            @elseif($student->unpaid_total !== null)
+                                <x-badge tone="bad">Owes ₱{{ number_format($student->unpaid_total, 2) }}</x-badge>
                             @else
-                                <x-badge tone="muted">Active</x-badge>
+                                <x-badge tone="good">Cleared</x-badge>
                             @endif
                         </td>
                         <td>

@@ -24,8 +24,8 @@ class ProcessFines extends Command
             ->get();
 
         foreach ($events as $event) {
-            $absentCount = $event->markAbsentees();
-            $this->info("Done: {$absentCount} student(s) marked absent for '{$event->name}' ({$event->penalty_points} pts each).");
+            [$absent, $late] = $event->markAbsentees();
+            $this->info("Done: '{$event->name}': {$absent} absent, {$late} late, fines added.");
         }
 
         $this->info('Absence processing complete.');

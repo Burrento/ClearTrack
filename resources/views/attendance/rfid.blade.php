@@ -2,12 +2,17 @@
 
 @section('content')
 @php
-    $recent = $event->attendances()->where('status', 'present')->with('user')->latest('updated_at')->take(8)->get();
-    $presentCount = $event->attendances()->where('status', 'present')->count();
+    $recorded = $event->attendances()->whereIn('status', ['present', 'late']);
+    $recent = (clone $recorded)->with('user')->latest('updated_at')->take(8)->get();
+    $counts = (clone $recorded)->get()->countBy('status');
+    $scan = session('scanned');
+    $late = ($scan['status'] ?? null) === 'late';
+    $startsLater = $event->start_time->isFuture();
 @endphp
 
 <x-page-header :title="$event->name" :back="route('events.show', $event)" back-label="Event details"
-    :description="'Until ' . $event->endsAt() . '. ' . $presentCount . ' present.'" />
+    :description="($startsLater ? 'Starts ' . $event->start_time->format('g:i A') . '. Taps after that count as late. ' : 'Started ' . $event->start_time->format('g:i A') . ', taps now count as late. ')
+        . ($counts['present'] ?? 0) . ' present, ' . ($counts['late'] ?? 0) . ' late.'" />
 
 <form action="{{ route('attendance.logRfid', $event) }}" method="POST" id="rfid-form">
     @csrf
@@ -16,11 +21,11 @@
 
 {{-- Scan result: sized to be read from across the table --}}
 <div aria-live="assertive">
-    @if(session('scanned'))
-        <div data-scan-result class="rounded-2xl bg-seal px-6 py-10 text-white sm:px-10 sm:py-14">
-            <p class="text-lg font-semibold text-white/80">Present</p>
-            <p class="mt-1 text-[clamp(2.25rem,6vw,4rem)] leading-[1.05] font-bold tracking-tight">{{ session('scanned') }}</p>
-            <p class="mt-3 text-white/80">Recorded at {{ now()->format('g:i:s A') }}</p>
+    @if($scan)
+        <div data-scan-result @class(['rounded-2xl px-6 py-10 text-white sm:px-10 sm:py-14', 'bg-wait' => $late, 'bg-seal' => !$late])>
+            <p class="text-lg font-semibold text-white/80">{{ $scan['repeat'] ? 'Already recorded' : ($late ? 'Late' : 'Present') }}</p>
+            <p class="mt-1 text-[clamp(2.25rem,6vw,4rem)] leading-[1.05] font-bold tracking-tight">{{ $scan['name'] }}</p>
+            <p class="mt-3 text-white/80">{{ $scan['repeat'] ? ucfirst($scan['status']) . ', tapped at' : 'Recorded at' }} {{ $scan['at'] }}</p>
         </div>
     @endif
     @error('rfid_uid')
@@ -51,7 +56,10 @@
             @foreach($recent as $attendance)
                 <li class="flex items-center justify-between gap-4 px-5 py-3">
                     <span class="font-semibold">{{ $attendance->user->name }}</span>
-                    <span class="text-sm text-ink-soft">{{ $attendance->updated_at->format('g:i A') }}</span>
+                    <span class="flex items-center gap-3 text-sm text-ink-soft">
+                        @if($attendance->status === 'late') <x-badge tone="wait">Late</x-badge> @endif
+                        {{ $attendance->updated_at->format('g:i A') }}
+                    </span>
                 </li>
             @endforeach
         </ul>

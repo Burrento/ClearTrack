@@ -88,8 +88,7 @@ class EventController extends Controller
     }
 
     /**
-     * Process absences for students who missed the event.
-     * Marks absent students so their penalty points accumulate.
+     * Process absences for students who missed the event and charge absent/late fines.
      */
     public function processFines(Event $event): RedirectResponse
     {
@@ -105,9 +104,9 @@ class EventController extends Controller
             return back()->with('error', 'Absences have already been processed for this event.');
         }
 
-        $absentCount = $event->markAbsentees();
+        [$absent, $late] = $event->markAbsentees();
 
-        return back()->with('status', "Absences processed. {$absentCount} student(s) marked absent and given {$event->penalty_points} penalty points.");
+        return back()->with('status', "Absences processed. {$absent} absent and {$late} late. Fines were added for each.");
     }
 
     private function validateEvent(Request $request): array
@@ -117,7 +116,8 @@ class EventController extends Controller
             'start_time' => 'required|date',
             'end_time' => 'required|date|after:start_time',
             'requires_survey' => 'boolean',
-            'penalty_points' => 'required|integer|min:0',
+            'absent_fine' => 'required|numeric|min:0|max:100000',
+            'late_fine' => 'required|numeric|min:0|max:100000',
         ]);
 
         $validated['requires_survey'] = $request->has('requires_survey');

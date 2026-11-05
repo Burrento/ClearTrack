@@ -25,18 +25,18 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="3" class="empty">No semesters yet. Until one is started, penalty points count every event.</td></tr>
+                    <tr><td colspan="3" class="empty">No semesters yet. Start one so fines are grouped by semester.</td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
     <form action="{{ route('admin.semesters') }}" method="POST" class="panel panel-body space-y-5 self-start"
-        onsubmit="return confirm('Start a new semester for every department? All students will be set to not cleared.')">
+        onsubmit="return confirm('Start a new semester for every department?')">
         @csrf
         <div>
             <h2 class="panel-title">Start new semester</h2>
-            <p class="mt-1 text-ink-soft">Penalty points start from zero, fine tiers carry over, and every student is set to not cleared.</p>
+            <p class="mt-1 text-ink-soft">New fines are filed under the new semester. Unpaid fines from earlier semesters still need to be paid.</p>
         </div>
         <div>
             <label for="name" class="label">Name</label>

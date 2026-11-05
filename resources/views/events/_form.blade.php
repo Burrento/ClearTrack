@@ -24,16 +24,26 @@
             @error('end_time') <p class="field-error">{{ $message }}</p> @enderror
         </div>
     </div>
-    <p class="hint -mt-3">Attendance is only accepted between these times.</p>
+    <p class="hint -mt-3">Scanning opens 1 hour before the start. A tap after the start time counts as late.</p>
 
-    <div class="max-w-48">
-        <label for="penalty_points" class="label">Penalty points</label>
-        <input type="number" name="penalty_points" id="penalty_points" required min="0"
-            value="{{ old('penalty_points', $event?->penalty_points ?? 1) }}"
-            @class(['input', 'input-invalid' => $errors->has('penalty_points')])>
-        @error('penalty_points') <p class="field-error">{{ $message }}</p> @enderror
-    </div>
-    <p class="hint -mt-4">Added to each student who misses this event.</p>
+    <fieldset>
+        <legend class="label">Fines</legend>
+        <div class="grid gap-6 sm:grid-cols-2">
+            @foreach(['absent_fine' => 'If absent', 'late_fine' => 'If late'] as $field => $label)
+                <div>
+                    <label for="{{ $field }}" class="mb-1.5 block text-[0.9375rem] text-ink-soft">{{ $label }}</label>
+                    <div class="relative">
+                        <span class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-soft" aria-hidden="true">₱</span>
+                        <input type="number" name="{{ $field }}" id="{{ $field }}" required min="0" step="0.01" inputmode="decimal"
+                            value="{{ old($field, $event ? (float) $event->$field : 0) }}"
+                            @class(['input pl-8', 'input-invalid' => $errors->has($field)])>
+                    </div>
+                    @error($field) <p class="field-error">{{ $message }}</p> @enderror
+                </div>
+            @endforeach
+        </div>
+        <p class="hint">Charged to each absent or late student when absences are processed after the event. Enter 0 for no fine.</p>
+    </fieldset>
 
     <label class="flex items-start gap-3">
         <input type="checkbox" name="requires_survey" value="1" class="checkbox mt-0.5"

@@ -34,7 +34,6 @@ class AttendanceSecurityTest extends TestCase
             'name' => 'Assembly',
             'start_time' => now()->subHour(),
             'end_time' => now()->addHour(),
-            'penalty_points' => 1,
         ]);
     }
 
@@ -92,7 +91,8 @@ class AttendanceSecurityTest extends TestCase
     // Item 5
     public function test_attendance_is_refused_outside_the_event_window(): void
     {
-        $upcoming = $this->event(['start_time' => now()->addHour(), 'end_time' => now()->addHours(2)]);
+        // Check-in opens an hour before the start, so two hours ahead is still closed
+        $upcoming = $this->event(['start_time' => now()->addHours(2), 'end_time' => now()->addHours(3)]);
         $processed = $this->event(['start_time' => now()->subHours(2), 'end_time' => now()->subHour()]);
         $processed->markAbsentees();
 
@@ -105,12 +105,29 @@ class AttendanceSecurityTest extends TestCase
         $this->assertSame('absent', $this->attendanceStatus($processed, $this->student));
     }
 
-    public function test_rfid_scan_marks_present_during_event(): void
+    public function test_tap_before_start_is_present_and_after_start_is_late(): void
     {
-        $event = $this->event();
+        $early = $this->event(['start_time' => now()->addMinutes(30), 'end_time' => now()->addHours(2)]);
+        $started = $this->event();
 
-        $this->actingAs($this->officer)->post(route('attendance.logRfid', $event), ['rfid_uid' => $this->student->rfid_uid])
+        $this->actingAs($this->officer)->post(route('attendance.logRfid', $early), ['rfid_uid' => $this->student->rfid_uid])
             ->assertSessionHasNoErrors();
+        $this->post(route('attendance.logRfid', $started), ['rfid_uid' => $this->student->rfid_uid])
+            ->assertSessionHas('scanned', fn ($s) => $s['status'] === 'late' && !$s['repeat']);
+
+        $this->assertSame('present', $this->attendanceStatus($early, $this->student));
+        $this->assertSame('late', $this->attendanceStatus($started, $this->student));
+    }
+
+    public function test_tapping_again_keeps_the_first_status(): void
+    {
+        $event = $this->event(['start_time' => now()->addMinutes(30), 'end_time' => now()->addHours(2)]);
+        $tap = fn () => $this->actingAs($this->officer)->post(route('attendance.logRfid', $event), ['rfid_uid' => $this->student->rfid_uid]);
+
+        $tap();
+        $this->travel(45)->minutes(); // now after the start
+        $tap()->assertSessionHas('scanned', fn ($s) => $s['repeat'] && $s['status'] === 'present');
+
         $this->assertSame('present', $this->attendanceStatus($event, $this->student));
     }
 }

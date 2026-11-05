@@ -1,8 +1,6 @@
 erDiagram
     DEPARTMENTS ||--o{ USERS : "belongs to"
     DEPARTMENTS ||--o{ EVENTS : "organizes"
-    DEPARTMENTS ||--o{ CLEARANCE_PERIODS : "manages"
-    SEMESTERS ||--o{ CLEARANCE_PERIODS : "scopes"
     SEMESTERS ||--o{ FINES : "scopes"
     USERS ||--o{ ATTENDANCES : "records"
     USERS ||--o{ FINES : "incurs"
@@ -22,7 +20,6 @@ erDiagram
         bigint department_id FK
         string rfid_uid
         string year_level
-        boolean is_cleared
         boolean is_active
         string remember_token
         timestamps created_at_updated_at
@@ -42,8 +39,9 @@ erDiagram
         string name
         datetime start_time
         datetime end_time
+        decimal absent_fine "0 = no fine"
+        decimal late_fine "0 = no fine"
         boolean requires_survey
-        decimal penalty_points
         boolean fines_processed
         timestamps created_at_updated_at
     }
@@ -52,7 +50,7 @@ erDiagram
         bigint id PK
         bigint event_id FK
         bigint user_id FK
-        enum status
+        string status "present, late or absent"
         string photo_path
         bigint verified_by_id FK
         timestamps created_at_updated_at
@@ -66,16 +64,6 @@ erDiagram
         decimal amount
         enum status
         text reason
-        timestamps created_at_updated_at
-    }
-
-    CLEARANCE_PERIODS {
-        bigint id PK
-        bigint department_id FK
-        bigint semester_id FK "nullable"
-        enum status
-        json fine_tiers
-        timestamp activated_at
         timestamps created_at_updated_at
     }
 

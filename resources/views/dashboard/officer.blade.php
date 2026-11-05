@@ -11,13 +11,11 @@
 
     $students = \App\Models\User::role('student')->where('department_id', $departmentId)->where('is_active', true);
     $studentCount = (clone $students)->count();
-    $clearedCount = (clone $students)->where('is_cleared', true)->count();
+    $clearedCount = (clone $students)->whereDoesntHave('fines', fn ($q) => $q->where('status', 'unpaid'))->count();
 
     $unpaid = \App\Models\Fine::where('status', 'unpaid')->whereHas('user', fn ($q) => $q->where('department_id', $departmentId));
     $unpaidCount = (clone $unpaid)->count();
     $unpaidTotal = (clone $unpaid)->sum('amount');
-
-    $clearanceOpen = Auth::user()->isClearanceActive();
 @endphp
 
 <x-page-header :title="Auth::user()->department->name" :description="$semester ? $semester->name : null">
@@ -74,18 +72,13 @@
     <section aria-labelledby="clearance-heading">
         <h2 id="clearance-heading" class="panel-title mb-4">Clearance</h2>
         <div class="panel panel-body">
-            @if($clearanceOpen)
-                <p class="text-lg"><strong>{{ $clearedCount }}</strong> of {{ $studentCount }} students cleared</p>
-                <div class="mt-3 h-3 overflow-hidden rounded-full bg-paper" role="progressbar" aria-label="Students cleared"
-                    aria-valuemin="0" aria-valuemax="{{ $studentCount }}" aria-valuenow="{{ $clearedCount }}">
-                    <div class="h-full rounded-full bg-seal" style="width: {{ $studentCount ? round($clearedCount / $studentCount * 100) : 0 }}%"></div>
-                </div>
-                <a href="{{ route('clearance.index') }}" class="action mt-4 inline-block">Open clearance list</a>
-            @else
-                <p class="text-lg font-semibold">Not open yet</p>
-                <p class="mt-1 text-ink-soft">When the semester's events are done, set your fine tiers and process fines to open clearance.</p>
-                <a href="{{ route('fines-settings.index') }}" class="action mt-4 inline-block">Go to fine tiers</a>
-            @endif
+            <p class="text-lg"><strong>{{ $clearedCount }}</strong> of {{ $studentCount }} students cleared</p>
+            <div class="mt-3 h-3 overflow-hidden rounded-full bg-paper" role="progressbar" aria-label="Students cleared"
+                aria-valuemin="0" aria-valuemax="{{ $studentCount }}" aria-valuenow="{{ $clearedCount }}">
+                <div class="h-full rounded-full bg-seal" style="width: {{ $studentCount ? round($clearedCount / $studentCount * 100) : 0 }}%"></div>
+            </div>
+            <p class="hint">Students with no unpaid fines are cleared automatically.</p>
+            <a href="{{ route('clearance.index') }}" class="action mt-4 inline-block">Open clearance list</a>
         </div>
     </section>
 </div>

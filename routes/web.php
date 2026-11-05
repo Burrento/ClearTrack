@@ -54,16 +54,8 @@ Route::middleware('auth')->group(function () {
 
         Route::post('events/{event}/process-fines', [EventController::class, 'processFines'])->name('events.processFines');
 
-        // Fines Settings (tier builder + process fines)
-        Route::get('fines-settings', [ClearanceController::class, 'index'])->name('fines-settings.index');
-        Route::post('fines-settings/tiers', [ClearanceController::class, 'storeTiers'])->name('fines-settings.storeTiers');
-        Route::post('fines-settings/process', [ClearanceController::class, 'activate'])->name('fines-settings.process');
-        Route::post('fines-settings/reset', [ClearanceController::class, 'deactivate'])->name('fines-settings.reset');
-
-        // Clearance (student list with clear/unclear)
-        Route::get('clearance', [ClearanceController::class, 'clearanceList'])->name('clearance.index');
-        Route::post('clearance/{user}/clear', [ClearanceController::class, 'clearStudent'])->name('clearance.clear');
-        Route::post('clearance/{user}/unclear', [ClearanceController::class, 'unclearStudent'])->name('clearance.unclear');
+        // Clearance is automatic (no unpaid fines); this lists who is cleared and who still owes
+        Route::get('clearance', [ClearanceController::class, 'index'])->name('clearance.index');
     });
 
     Route::middleware('role:admin')->group(function () {

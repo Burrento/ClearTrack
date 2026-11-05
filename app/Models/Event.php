@@ -4,10 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
-#[Fillable(['department_id', 'name', 'start_time', 'end_time', 'requires_survey', 'penalty_points', 'fines_processed'])]
+#[Fillable(['department_id', 'name', 'start_time', 'end_time', 'absent_fine', 'late_fine', 'requires_survey', 'fines_processed'])]
 class Event extends Model
 {
+    /**
+     * Scanning opens this long before the start so on-time students can tap in; any tap after
+     * the start time counts as late.
+     */
+    public const CHECK_IN_OPENS_MINUTES_BEFORE = 60;
+
     /**
      * Get the attendances for the event.
      */
@@ -34,17 +41,32 @@ class Event extends Model
         return [
             'start_time' => 'datetime',
             'end_time' => 'datetime',
+            'absent_fine' => 'decimal:2',
+            'late_fine' => 'decimal:2',
             'requires_survey' => 'boolean',
             'fines_processed' => 'boolean',
         ];
     }
 
+    public function checkInOpensAt()
+    {
+        return $this->start_time->copy()->subMinutes(self::CHECK_IN_OPENS_MINUTES_BEFORE);
+    }
+
     /**
-     * Attendance can only be recorded while the event is running and before absences are processed.
+     * Attendance can be recorded from check-in opening until the end, before absences are processed.
      */
     public function isOpenForAttendance(): bool
     {
-        return !$this->fines_processed && now()->between($this->start_time, $this->end_time);
+        return !$this->fines_processed && now()->between($this->checkInOpensAt(), $this->end_time);
+    }
+
+    /**
+     * The attendance status a tap made right now records.
+     */
+    public function tapStatus(): string
+    {
+        return now()->gt($this->start_time) ? 'late' : 'present';
     }
 
     /**
@@ -54,7 +76,7 @@ class Event extends Model
     {
         return match (true) {
             $this->fines_processed => 'processed',
-            $this->start_time->isFuture() => 'upcoming',
+            $this->checkInOpensAt()->isFuture() => 'upcoming',
             $this->end_time->isPast() => 'ended',
             default => 'live',
         };
@@ -78,31 +100,48 @@ class Event extends Model
     }
 
     /**
-     * Mark every department student without a "present" attendance as absent,
-     * flag the event as processed, and return how many were marked.
+     * Mark every department student who didn't tap in as absent, fine absent and late students
+     * this event's amounts, and flag the event as processed. Returns [absent count, late count].
      */
-    public function markAbsentees(): int
+    public function markAbsentees(): array
     {
-        $attendances = $this->attendances()->get()->keyBy('user_id');
-        $absentCount = 0;
+        return DB::transaction(function () {
+            $attendances = $this->attendances()->get()->keyBy('user_id');
+            $students = User::role('student')->where('department_id', $this->department_id)->where('is_active', true)->get();
+            $semesterId = Semester::current()?->id;
+            $counts = ['absent' => 0, 'late' => 0];
 
-        $students = User::role('student')->where('department_id', $this->department_id)->where('is_active', true)->get();
+            foreach ($students as $student) {
+                $attendance = $attendances->get($student->id);
 
-        foreach ($students as $student) {
-            $attendance = $attendances->get($student->id);
+                if (!$attendance) {
+                    $attendance = $this->attendances()->create(['user_id' => $student->id, 'status' => 'absent']);
+                } elseif (!in_array($attendance->status, ['present', 'late'])) {
+                    $attendance->update(['status' => 'absent']); // leftover pending_verification
+                }
 
-            if (!$attendance) {
-                $this->attendances()->create(['user_id' => $student->id, 'status' => 'absent']);
-                $absentCount++;
-            } elseif ($attendance->status !== 'present') {
-                // e.g. pending_verification
-                $attendance->update(['status' => 'absent']);
-                $absentCount++;
+                if ($attendance->status === 'present') {
+                    continue;
+                }
+
+                $counts[$attendance->status]++;
+                $amount = $attendance->status === 'late' ? $this->late_fine : $this->absent_fine;
+
+                if ($amount > 0) {
+                    Fine::create([
+                        'user_id' => $student->id,
+                        'event_id' => $this->id,
+                        'semester_id' => $semesterId,
+                        'amount' => $amount,
+                        'status' => 'unpaid',
+                        'reason' => ucfirst($attendance->status),
+                    ]);
+                }
             }
-        }
 
-        $this->update(['fines_processed' => true]);
+            $this->update(['fines_processed' => true]);
 
-        return $absentCount;
+            return [$counts['absent'], $counts['late']];
+        });
     }
 }

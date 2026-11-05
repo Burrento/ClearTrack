@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Attendance;
-use App\Models\ClearancePeriod;
 use App\Models\Event;
 use App\Models\Fine;
 use App\Models\Semester;
@@ -13,7 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Every page renders for its role with realistic data (live event, open clearance, unpaid fine).
+ * Every page renders for its role with realistic data (live event, late tap, unpaid fine).
  */
 class PagesRenderTest extends TestCase
 {
@@ -27,15 +26,13 @@ class PagesRenderTest extends TestCase
         $student = User::role('student')->first();
 
         $semester = Semester::create(['name' => '1st Sem', 'starts_at' => now()->subMonth()]);
-        $live = Event::create(['department_id' => $officer->department_id, 'name' => 'Assembly', 'start_time' => now()->subHour(), 'end_time' => now()->addHour(), 'penalty_points' => 2, 'requires_survey' => true]);
-        $past = Event::create(['department_id' => $officer->department_id, 'name' => 'Seminar', 'start_time' => now()->subDays(3), 'end_time' => now()->subDays(3)->addHours(2), 'penalty_points' => 3]);
+        $live = Event::create(['department_id' => $officer->department_id, 'name' => 'Assembly', 'start_time' => now()->subHour(), 'end_time' => now()->addHour(), 'absent_fine' => 50, 'late_fine' => 20, 'requires_survey' => true]);
+        $past = Event::create(['department_id' => $officer->department_id, 'name' => 'Seminar', 'start_time' => now()->subDays(3), 'end_time' => now()->subDays(3)->addHours(2), 'absent_fine' => 50]);
         $survey = Survey::create(['event_id' => $live->id, 'title' => 'Feedback']);
         $survey->questions()->create(['question_text' => 'How was it?']);
         Attendance::create(['event_id' => $past->id, 'user_id' => $student->id, 'status' => 'absent']);
-        Attendance::create(['event_id' => $live->id, 'user_id' => $student->id, 'status' => 'present', 'verified_by_id' => $officer->id]);
-        ClearancePeriod::create(['department_id' => $officer->department_id, 'semester_id' => $semester->id, 'status' => 'active', 'activated_at' => now(),
-            'fine_tiers' => [['min_points' => 1, 'max_points' => null, 'fine_amount' => 50, 'requirements' => 'Letter of apology']]]);
-        Fine::create(['user_id' => $student->id, 'semester_id' => $semester->id, 'amount' => 50, 'status' => 'unpaid', 'reason' => 'Clearance Period — 3 pts']);
+        Attendance::create(['event_id' => $live->id, 'user_id' => $student->id, 'status' => 'late', 'verified_by_id' => $officer->id]);
+        Fine::create(['user_id' => $student->id, 'event_id' => $past->id, 'semester_id' => $semester->id, 'amount' => 50, 'status' => 'unpaid', 'reason' => 'Absent']);
 
         $this->get('/login')->assertOk();
 
@@ -44,10 +41,10 @@ class PagesRenderTest extends TestCase
             $this->get(route($route))->assertOk();
         }
         $this->get(route('surveys.show', $survey))->assertOk();
-        $this->get(route('dashboard'))->assertSee('Not cleared')->assertSee('Letter of apology');
+        $this->get(route('dashboard'))->assertSee('Not cleared')->assertSee('Seminar, absent');
 
         $this->actingAs($officer);
-        foreach (['dashboard', 'events.index', 'events.create', 'students.index', 'fines.index', 'fines-settings.index', 'clearance.index', 'settings'] as $route) {
+        foreach (['dashboard', 'events.index', 'events.create', 'students.index', 'fines.index', 'clearance.index', 'settings'] as $route) {
             $this->get(route($route))->assertOk();
         }
         foreach (['events.show', 'events.edit', 'attendance.rfid', 'surveys.create'] as $route) {

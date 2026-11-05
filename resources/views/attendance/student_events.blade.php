@@ -23,7 +23,8 @@
                     @if($attendance)
                         @switch($attendance->status)
                             @case('present') <x-badge tone="good">Present</x-badge> @break
-                            @default <x-badge tone="bad">Absent, +{{ $event->penalty_points }} {{ \Illuminate\Support\Str::plural('pt', $event->penalty_points) }}</x-badge>
+                            @case('late') <x-badge tone="wait">Late{{ $event->late_fine > 0 ? ', ₱' . number_format($event->late_fine, 2) . ' fine' : '' }}</x-badge> @break
+                            @default <x-badge tone="bad">Absent{{ $event->absent_fine > 0 ? ', ₱' . number_format($event->absent_fine, 2) . ' fine' : '' }}</x-badge>
                         @endswitch
 
                         @if($event->requires_survey && $event->survey)

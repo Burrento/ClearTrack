@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<x-page-header title="Events and attendance" description="Students who miss an event get its penalty points once absences are processed.">
+<x-page-header title="Events and attendance" description="Absent and late students are fined once an event's absences are processed.">
     <a href="{{ route('events.create') }}" class="btn btn-primary">Create event</a>
 </x-page-header>
 
@@ -11,7 +11,7 @@
             <tr>
                 <th>Event</th>
                 <th>When</th>
-                <th>Penalty</th>
+                <th>Fines</th>
                 <th>Status</th>
                 <th><span class="sr-only">Actions</span></th>
             </tr>
@@ -21,12 +21,12 @@
                 <tr>
                     <td><a href="{{ route('events.show', $event) }}" class="font-semibold hover:underline">{{ $event->name }}</a></td>
                     <td class="whitespace-nowrap text-ink-soft">{{ $event->schedule() }}</td>
-                    <td class="whitespace-nowrap">{{ $event->penalty_points }} {{ \Illuminate\Support\Str::plural('pt', $event->penalty_points) }}</td>
+                    <td class="whitespace-nowrap">₱{{ number_format($event->absent_fine, 2) }} absent<br><span class="text-ink-soft">₱{{ number_format($event->late_fine, 2) }} late</span></td>
                     <td><x-event-phase :event="$event" /></td>
                     <td>
                         <div class="flex justify-end gap-4">
                             <a href="{{ route('events.edit', $event) }}" class="action">Edit</a>
-                            <form action="{{ route('events.destroy', $event) }}" method="POST" onsubmit="return confirm('Delete {{ addslashes($event->name) }}? Its attendance records are deleted too.')">
+                            <form action="{{ route('events.destroy', $event) }}" method="POST" onsubmit="return confirm(@js('Delete ' . $event->name . '? Its attendance records and fines, paid or not, are deleted too.'))">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="action-danger">Delete</button>

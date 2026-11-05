@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ClearancePeriod;
 use App\Models\Department;
 use App\Models\Semester;
 use App\Models\User;
@@ -99,8 +98,8 @@ class AdminController extends Controller
     }
 
     /**
-     * Start a new semester for every department: fresh penalty points, carried-over fine tiers,
-     * everyone un-cleared, and optionally deactivate a graduating year level.
+     * Start a new semester for every department, optionally deactivating a graduating year level.
+     * New fines carry the new semester; earlier fines stay on record.
      */
     public function startSemester(Request $request): RedirectResponse
     {
@@ -113,30 +112,13 @@ class AdminController extends Controller
         ]);
 
         $deactivated = DB::transaction(function () use ($validated) {
-            $semester = Semester::create(['name' => $validated['name'], 'starts_at' => $validated['starts_at']]);
-
-            ClearancePeriod::query()->update(['status' => 'inactive']);
-
-            foreach (Department::active()->get() as $department) {
-                $previous = ClearancePeriod::where('department_id', $department->id)->latest('id')->first();
-
-                if ($previous) {
-                    ClearancePeriod::create([
-                        'department_id' => $department->id,
-                        'semester_id' => $semester->id,
-                        'status' => 'inactive',
-                        'fine_tiers' => $previous->fine_tiers,
-                    ]);
-                }
-            }
-
-            User::role('student')->update(['is_cleared' => false]);
+            Semester::create(['name' => $validated['name'], 'starts_at' => $validated['starts_at']]);
 
             return empty($validated['deactivate_year_level']) ? 0
                 : User::role('student')->where('year_level', $validated['deactivate_year_level'])->update(['is_active' => false]);
         });
 
-        return back()->with('status', "{$validated['name']} started. Fine tiers were carried over and every student is now not cleared."
+        return back()->with('status', "{$validated['name']} started."
             . ($deactivated ? " {$deactivated} student(s) deactivated." : ''));
     }
 }

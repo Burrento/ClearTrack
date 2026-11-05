@@ -5,10 +5,9 @@
     $groups = match (true) {
         auth()->user()->hasRole('officer') => [
             ['title' => null, 'links' => [$link('Dashboard', 'dashboard')]],
-            // A real sequence: attendance becomes points, points become fines, paid fines allow clearance
+            // A real sequence: attendance becomes fines, paid fines mean cleared
             ['title' => 'Clearance process', 'sequence' => true, 'links' => [
                 $link('Events and attendance', 'events.index', 'events.*'),
-                $link('Fine tiers', 'fines-settings.index', 'fines-settings.*'),
                 $link('Fines', 'fines.index', 'fines.*'),
                 $link('Clearance', 'clearance.index', 'clearance.*'),
             ]],
