@@ -158,7 +158,6 @@
                             <li><strong class="text-ink">name</strong>: e.g. <span class="code">Dela Cruz, Juan</span> (last name first with a comma for two-word last names)</li>
                             <li><strong class="text-ink">student_id</strong>: e.g. <span class="code">LGC25-105680</span></li>
                             <li><strong class="text-ink">year_level</strong>: First Year, Second Year, Third Year, Fourth Year or Fifth Year</li>
-                            <li><strong class="text-ink">rfid</strong>: optional; leave empty and tap cards later with Edit</li>
                         </ul>
                     </li>
                     <li>Save as <strong>CSV</strong> and upload it here.</li>
@@ -179,7 +178,7 @@
                         </div>
                     @enderror
                 </div>
-                <p class="hint">Students already registered are skipped. Each new student's password is their last name plus the last 6 digits of their ID.</p>
+                <p class="hint">Students already registered are skipped. Each new student's password is their last name plus the last 6 digits of their ID. Add RFID cards afterwards with Edit on each student.</p>
             </div>
 
             <div class="flex flex-col-reverse gap-3 border-t border-rule bg-paper/50 px-6 py-4 sm:flex-row sm:justify-end">

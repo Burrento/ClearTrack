@@ -33,13 +33,14 @@ class StudentImportTest extends TestCase
     {
         $response = $this->actingAs($this->officer)->get(route('students.importTemplate'))->assertOk();
 
-        $this->assertSame("\u{FEFF}name,student_id,year_level,rfid\r\n", $response->streamedContent());
+        $this->assertSame("\u{FEFF}name,student_id,year_level\r\n", $response->streamedContent());
         $this->assertStringContainsString('attachment; filename=cleartrack-students-template.csv', $response->headers->get('Content-Disposition'));
     }
 
     public function test_imports_students_into_the_officers_department(): void
     {
-        // Excel-style: BOM, capitalised headers, quoted name with a comma, lowercase ID and year, blank line
+        // Excel-style: BOM, capitalised headers, quoted name with a comma, lowercase ID and year, blank line,
+        // and an extra column (an old template's rfid) that is ignored
         $csv = "\u{FEFF}Name,Student_ID,Year_Level,RFID\r\n"
             . "\"Dela Cruz, Juan\",lgc25-200001,second year,04:a1:b2:c3\r\n"
             . "\r\n"
@@ -52,21 +53,20 @@ class StudentImportTest extends TestCase
         $juan = User::where('username', 'LGC25-200001')->sole();
         $this->assertSame('Dela Cruz, Juan', $juan->name);
         $this->assertSame('Second Year', $juan->year_level);
-        $this->assertSame('04A1B2C3', $juan->rfid_uid);
+        $this->assertNull($juan->rfid_uid); // cards are added later with Edit
         $this->assertSame($this->officer->department_id, $juan->department_id);
         $this->assertTrue($juan->hasRole('student'));
         $this->assertTrue(Hash::check('Delacruz200001', $juan->password));
-        $this->assertNull(User::where('username', 'LGC25-200002')->value('rfid_uid'));
     }
 
     public function test_any_bad_row_imports_nothing_and_lists_the_problems(): void
     {
-        $csv = "name,student_id,year_level,rfid\n"
-            . "Good Student,LGC25-300001,First Year,\n"
-            . ",LGC25-300002,First Year,\n"
-            . "Bad Id,12345,First Year,\n"
-            . "Bad Year,LGC25-300003,Freshman,\n"
-            . "Twin,LGC25-300001,First Year,\n";
+        $csv = "name,student_id,year_level\n"
+            . "Good Student,LGC25-300001,First Year\n"
+            . ",LGC25-300002,First Year\n"
+            . "Bad Id,12345,First Year\n"
+            . "Bad Year,LGC25-300003,Freshman\n"
+            . "Twin,LGC25-300001,First Year\n";
 
         $this->upload($csv)->assertSessionHasErrors('csv')
             ->assertSessionHas('csv_problems', fn ($p) => count($p) === 4
@@ -78,13 +78,9 @@ class StudentImportTest extends TestCase
         $this->assertSame(0, User::where('username', 'like', 'LGC25-3%')->count());
     }
 
-    public function test_missing_columns_and_card_conflicts_are_rejected(): void
+    public function test_missing_columns_are_rejected(): void
     {
         $this->upload("name,id\nJuan,LGC25-400001\n")->assertSessionHasErrors('csv');
-
-        $taken = User::role('student')->first()->rfid_uid;
-        $this->upload("name,student_id,year_level,rfid\nJuan,LGC25-400001,First Year,{$taken}\n")
-            ->assertSessionHas('csv_problems', fn ($p) => str_contains($p[0], 'already registered to another student'));
         $this->assertNull(User::where('username', 'LGC25-400001')->first());
     }
 

@@ -88,7 +88,7 @@ class StudentController extends Controller
      * Accept serials typed with colons/dashes/spaces; store bare hex to match scans.
      */
     private const YEAR_LEVELS = ['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'];
-    private const CSV_COLUMNS = ['name', 'student_id', 'year_level', 'rfid'];
+    private const CSV_COLUMNS = ['name', 'student_id', 'year_level']; // cards are tapped in later with Edit
 
     /**
      * An empty CSV with just the headers, to fill in with Excel or Google Sheets.
@@ -103,6 +103,7 @@ class StudentController extends Controller
     /**
      * Registers every student in the CSV into the officer's department, or none: if any row has a
      * problem, nothing is imported and each problem is listed. Students already registered are skipped.
+     * Extra columns (an old template's rfid, notes) are ignored.
      */
     public function import(Request $request): RedirectResponse
     {
@@ -117,8 +118,7 @@ class StudentController extends Controller
 
         $years = collect(self::YEAR_LEVELS)->keyBy(fn ($y) => strtolower($y));
         $existing = User::pluck('username')->flip();
-        $usedCards = User::whereNotNull('rfid_uid')->pluck('rfid_uid')->flip();
-        $rows = $problems = $seenIds = $seenCards = [];
+        $rows = $problems = $seenIds = [];
         $skipped = 0;
         $line = 1;
 
@@ -132,26 +132,22 @@ class StudentController extends Controller
             $name = trim($row['name']);
             $id = strtoupper(trim($row['student_id']));
             $year = $years->get(strtolower(trim($row['year_level'])));
-            $card = $this->normalizeRfid($row['rfid'] ?? null);
 
             $rowProblems = array_filter([
                 $name === '' ? 'name is empty' : null,
                 !preg_match('/^LGC\d{2}-\d{6}$/', $id) ? "student ID \"{$row['student_id']}\" isn't like LGC25-105680" : null,
                 isset($seenIds[$id]) ? "student ID {$id} is also on line {$seenIds[$id]}" : null,
                 !$year ? "year level \"{$row['year_level']}\" should be one of: " . implode(', ', self::YEAR_LEVELS) : null,
-                $card && isset($usedCards[$card]) ? 'RFID card is already registered to another student' : null,
-                $card && isset($seenCards[$card]) ? "RFID card is also on line {$seenCards[$card]}" : null,
             ]);
 
             $seenIds[$id] ??= $line;
-            if ($card) $seenCards[$card] ??= $line;
 
             if ($rowProblems) {
                 $problems[] = "Line {$line}: " . implode('; ', $rowProblems) . '.';
             } elseif (isset($existing[$id])) {
                 $skipped++;
             } else {
-                $rows[] = compact('name', 'id', 'year', 'card');
+                $rows[] = compact('name', 'id', 'year');
             }
         }
         fclose($handle);
@@ -173,7 +169,6 @@ class StudentController extends Controller
                     'username' => $r['id'],
                     'password' => Hash::make(User::defaultPassword($r['name'], $r['id']), ['rounds' => 8]),
                     'department_id' => auth()->user()->department_id,
-                    'rfid_uid' => $r['card'],
                     'year_level' => $r['year'],
                     'created_at' => $now,
                     'updated_at' => $now,
