@@ -195,6 +195,43 @@ cd /var/www/cleartrack && sudo -u cleartrack -H git pull && sudo -u cleartrack -
 
 Don't update during an event.
 
+Or run the same steps from `deploy.sh`:
+
+```bash
+sudo -u cleartrack -H sh /var/www/cleartrack/deploy.sh
+```
+
+## 10. Automatic updates (GitHub Actions)
+
+`.github/workflows/deploy.yml` runs the tests on every push to `main`. Only if they pass does it SSH in and run `deploy.sh`. A failing test means the live site isn't touched. One-time setup:
+
+**On the server (as root).** Create a key that may only run the deploy. The `command=` prefix means that even if the key leaked, it couldn't open a shell:
+
+```bash
+mkdir -p /home/cleartrack/.ssh && ssh-keygen -t ed25519 -f /root/github_deploy -N "" -C github-actions && echo "command=\"cd /var/www/cleartrack && git pull --ff-only && sh deploy.sh\",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty $(cat /root/github_deploy.pub)" >> /home/cleartrack/.ssh/authorized_keys && chown -R cleartrack:cleartrack /home/cleartrack/.ssh && chmod 700 /home/cleartrack/.ssh && chmod 600 /home/cleartrack/.ssh/authorized_keys && echo KEY_OK
+```
+
+Print the two values GitHub needs:
+
+```bash
+echo "=== DEPLOY_SSH_KEY ==="; cat /root/github_deploy; echo "=== DEPLOY_KNOWN_HOSTS ==="; ssh-keyscan -t ed25519 178.128.57.54 2>/dev/null
+```
+
+**On GitHub:** repo → Settings → Secrets and variables → Actions → **New repository secret**, twice:
+
+| Name | Value |
+|---|---|
+| `DEPLOY_SSH_KEY` | everything from `-----BEGIN OPENSSH PRIVATE KEY-----` to `-----END OPENSSH PRIVATE KEY-----`, both lines included |
+| `DEPLOY_KNOWN_HOSTS` | the line starting `178.128.57.54 ssh-ed25519` |
+
+Then delete the private key from the server, since GitHub holds the only copy now:
+
+```bash
+rm /root/github_deploy
+```
+
+Watch each run under the repo's **Actions** tab: a green tick means it's deployed, a red cross means tests failed or the deploy did. A push still goes live within ~3 minutes, so **don't push to `main` during an event.**
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |

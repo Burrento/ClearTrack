@@ -1,0 +1,35 @@
+# On every push to main: run the tests, and only if they pass, update the live server.
+# Setup (secrets, server key) is in docs/deploy-digitalocean.md, "Automatic updates".
+name: Test and deploy
+
+on:
+  push:
+    branches: [main]
+
+# A newer push waits for the running deploy instead of overlapping it
+concurrency: deploy
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: composer install --no-interaction --no-progress
+      - run: npm ci && npm run build # page tests render @vite assets
+      - run: cp .env.example .env && php artisan key:generate
+      - run: php artisan test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Update the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The server only lets this key run deploy.sh (see authorized_keys), whatever is sent here
+          ssh -i ~/.ssh/deploy_key cleartrack@178.128.57.54 deploy
