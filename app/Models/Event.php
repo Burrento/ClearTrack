@@ -27,7 +27,9 @@ class Event extends Model
 
     public function sessions()
     {
-        return $this->hasMany(EventSession::class)->orderBy('starts_at');
+        // Fixed morning → afternoon → evening order; the form keeps their times in that order too
+        return $this->hasMany(EventSession::class)
+            ->orderByRaw("CASE name WHEN 'morning' THEN 1 WHEN 'afternoon' THEN 2 ELSE 3 END");
     }
 
     /**

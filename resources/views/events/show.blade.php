@@ -6,8 +6,21 @@
     // One row per student, with that student's attendance per session
     $byStudent = $event->attendances()->with('user')->get()->groupBy('user_id')
         ->map(fn ($rows) => ['user' => $rows->first()->user, 'sessions' => $rows->keyBy('event_session_id')])
-        ->sortBy(fn ($r) => $r['user']->name);
+        ->sortBy(fn ($r) => $r['user']->name)->values();
     $money = fn ($amount) => '₱' . number_format($amount, 2);
+
+    // What the attendance search and filter match against, one entry per student row
+    $filterRows = $byStudent->map(function ($r) use ($sessions, $event) {
+        $rows = $sessions->map(fn ($s) => $r['sessions']->get($s->id));
+        return [
+            'text' => strtolower($r['user']->name . ' ' . $r['user']->username),
+            'year' => $r['user']->year_level,
+            'late' => $rows->contains(fn ($a) => $a?->status === 'late'),
+            'absent' => $rows->contains(fn ($a) => !$a || $a->status === 'absent'),
+            'no_in' => $rows->contains(fn ($a) => $a?->status === 'missed_in'),
+            'no_out' => $rows->contains(fn ($a) => $a && $a->time_in_at && !$a->time_out_at),
+        ];
+    });
 @endphp
 
 <x-page-header :title="$event->name" :back="route('events.index')" back-label="Events">
@@ -108,8 +121,49 @@
     </ul>
 </section>
 
-<section aria-labelledby="log-heading">
+<section aria-labelledby="log-heading" x-data="{
+        search: '', year: '', show: '', rows: @js($filterRows),
+        matches(row) {
+            return (this.search === '' || row.text.includes(this.search.toLowerCase()))
+                && (this.year === '' || row.year === this.year)
+                && (this.show === '' || row[this.show]);
+        },
+        get shown() { return this.rows.filter((row) => this.matches(row)).length },
+    }">
     <h2 id="log-heading" class="panel-title mb-4">Attendance</h2>
+
+    @if($byStudent->isNotEmpty())
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+            <label class="relative w-full sm:w-72">
+                <span class="sr-only">Search by name or ID</span>
+                <svg class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-soft" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
+                <input type="search" x-model="search" placeholder="Search name or ID" class="input pl-9">
+            </label>
+            <label class="w-full sm:w-44">
+                <span class="sr-only">Year level</span>
+                <select x-model="year" class="input">
+                    <option value="">All year levels</option>
+                    @foreach(['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'] as $level)
+                        <option value="{{ $level }}">{{ $level }}</option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="w-full sm:w-48">
+                <span class="sr-only">Show</span>
+                <select x-model="show" class="input">
+                    <option value="">Everyone</option>
+                    <option value="late">Late in any session</option>
+                    <option value="absent">Absent from a session</option>
+                    <option value="no_in">No time in</option>
+                    <option value="no_out">No time out</option>
+                </select>
+            </label>
+            <p class="text-sm text-ink-soft sm:ml-auto" aria-live="polite">Showing <span x-text="shown">{{ $byStudent->count() }}</span> of {{ $byStudent->count() }}</p>
+        </div>
+    @endif
+
     <div class="panel overflow-x-auto">
         <table class="data-table">
             <thead>
@@ -123,7 +177,7 @@
             </thead>
             <tbody>
                 @forelse($byStudent as $row)
-                    <tr>
+                    <tr x-show="matches(rows[{{ $loop->index }}])">
                         <td class="font-semibold whitespace-nowrap">{{ $row['user']->name }}</td>
                         @foreach($sessions as $session)
                             @php $a = $row['sessions']->get($session->id); @endphp
@@ -155,8 +209,17 @@
                 @empty
                     <tr><td colspan="{{ 1 + 2 * $sessions->count() }}" class="empty">No attendance yet. Time in opens 1 hour before each session starts.</td></tr>
                 @endforelse
+                @if($byStudent->isNotEmpty())
+                    <tr x-show="shown === 0" style="display: none">
+                        <td colspan="{{ 1 + 2 * $sessions->count() }}" class="empty">No students match. Clear the search or choose another filter.</td>
+                    </tr>
+                @endif
             </tbody>
         </table>
     </div>
 </section>
 @endsection
+
+@push('scripts')
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+@endpush
