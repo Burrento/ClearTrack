@@ -25,6 +25,7 @@
                     <td><x-event-phase :event="$event" /></td>
                     <td>
                         <div class="flex justify-end gap-4">
+                            <a href="{{ route('events.show', $event) }}" class="action">Open</a>
                             <a href="{{ route('events.edit', $event) }}" class="action">Edit</a>
                             <form action="{{ route('events.destroy', $event) }}" method="POST" onsubmit="return confirm(@js('Delete ' . $event->name . '? Its attendance records and fines, paid or not, are deleted too.'))">
                                 @csrf
