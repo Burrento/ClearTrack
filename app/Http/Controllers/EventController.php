@@ -20,6 +20,7 @@ class EventController extends Controller
     public function index(): View
     {
         $events = Event::where('department_id', Auth::user()->department_id)
+            ->with('sessions')
             ->orderBy('start_time', 'desc')
             ->get();
 

@@ -19,11 +19,27 @@
         <tbody>
             @forelse($events as $event)
                 <tr>
-                    <td><a href="{{ route('events.show', $event) }}" class="font-semibold hover:underline">{{ $event->name }}</a></td>
-                    <td class="whitespace-nowrap text-ink-soft">{{ $event->schedule() }}</td>
-                    <td class="whitespace-nowrap">₱{{ number_format($event->absent_fine, 2) }} absent<br><span class="text-ink-soft">₱{{ number_format($event->late_fine, 2) }} late, ₱{{ number_format($event->missed_out_fine, 2) }} no time out</span></td>
-                    <td><x-event-phase :event="$event" /></td>
-                    <td>
+                    <td class="min-w-48 align-top">
+                        <a href="{{ route('events.show', $event) }}" class="font-semibold hover:underline">{{ $event->name }}</a>
+                    </td>
+                    <td class="align-top whitespace-nowrap">
+                        <span class="block font-semibold">{{ $event->start_time->format('D, M j, Y') }}</span>
+                        @foreach($event->sessions as $session)
+                            <span class="block text-sm text-ink-soft">
+                                <span class="inline-block w-20 text-ink">{{ $session->label() }}</span>{{ $session->times() }}
+                            </span>
+                        @endforeach
+                    </td>
+                    <td class="align-top whitespace-nowrap text-sm">
+                        <dl class="grid grid-cols-[auto_auto] gap-x-3">
+                            @foreach(['Absent' => $event->absent_fine, 'Late' => $event->late_fine, 'No time in' => $event->missed_in_fine, 'No time out' => $event->missed_out_fine] as $label => $amount)
+                                <dt class="text-ink-soft">{{ $label }}</dt>
+                                <dd class="text-right font-semibold">₱{{ number_format($amount, 2) }}</dd>
+                            @endforeach
+                        </dl>
+                    </td>
+                    <td class="align-top"><x-event-phase :event="$event" /></td>
+                    <td class="align-top">
                         <div class="flex justify-end gap-4">
                             <a href="{{ route('events.show', $event) }}" class="action">Open</a>
                             <a href="{{ route('events.edit', $event) }}" class="action">Edit</a>
