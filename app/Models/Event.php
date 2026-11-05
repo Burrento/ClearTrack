@@ -65,9 +65,12 @@ class Event extends Model
         ];
     }
 
+    /**
+     * When the first time in opens (earlier if an officer started attendance early).
+     */
     public function checkInOpensAt()
     {
-        return $this->start_time->copy()->subMinutes(EventSession::IN_OPENS_MINUTES_BEFORE);
+        return $this->sessions->map->inOpensAt()->min();
     }
 
     /**

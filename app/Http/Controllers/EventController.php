@@ -98,6 +98,26 @@ class EventController extends Controller
     /**
      * Process absences for students who missed the event and charge absent, late and missed-tap fines.
      */
+    /**
+     * Opens the next session's time in right now instead of 1 hour before its start. Taps before
+     * the start still count as on time; time out and the other sessions keep their usual windows.
+     */
+    public function startEarly(Event $event): RedirectResponse
+    {
+        $this->authorizeDepartment($event->department_id);
+
+        $session = $event->sessions->first(fn ($s) => $s->inOpensAt()->isFuture());
+
+        if ($event->fines_processed || $event->isOpenForAttendance() || !$session) {
+            return back()->with('error', 'Attendance is already open or this event has finished.');
+        }
+
+        $session->update(['in_opens_at' => now()]);
+
+        return redirect()->route('attendance.rfid', $event)->with('status',
+            "{$session->label()} time in is open. Taps before {$session->starts_at->format('g:i A')} count as on time.");
+    }
+
     public function processFines(Event $event): RedirectResponse
     {
         $this->authorizeDepartment($event->department_id);

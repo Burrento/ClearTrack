@@ -146,6 +146,37 @@ class EventSessionsTest extends TestCase
         $this->assertSame('absent', $this->row($event, 'afternoon')->status);
     }
 
+    public function test_officer_starts_attendance_early(): void
+    {
+        $event = $this->dayEvent();
+
+        $this->tapAt($event, '06:00')->assertStatus(422); // usually opens at 7:00
+        $this->actingAs($this->officer)->get(route('events.show', $event))->assertSee('Start attendance now');
+
+        $this->post(route('events.startEarly', $event))->assertRedirect(route('attendance.rfid', $event));
+        $this->assertSame('06:00', $event->sessions()->where('name', 'morning')->value('in_opens_at')->format('H:i'));
+        $this->assertNull($event->sessions()->where('name', 'afternoon')->value('in_opens_at'));
+        $this->assertSame('live', $event->fresh()->phase());
+
+        $this->tapAt($event, '06:05')->assertJson(['action' => 'in', 'status' => 'present', 'session' => 'Morning']);
+        $this->tapAt($event, '11:40')->assertJson(['action' => 'out']); // time out unchanged
+    }
+
+    public function test_starting_early_is_refused_for_other_departments_and_finished_events(): void
+    {
+        $event = $this->dayEvent();
+        $soaOfficer = User::create(['name' => 'SOA Officer', 'username' => 'soa_officer', 'password' => 'x',
+            'department_id' => \App\Models\Department::where('code', 'SOA')->value('id')]);
+        $soaOfficer->assignRole('officer');
+
+        $this->travelTo($this->day->copy()->setTime(6, 0));
+        $this->actingAs($soaOfficer)->post(route('events.startEarly', $event))->assertForbidden();
+
+        $event->update(['fines_processed' => true]);
+        $this->actingAs($this->officer)->post(route('events.startEarly', $event))->assertSessionHas('error');
+        $this->assertNull($event->sessions()->where('name', 'morning')->value('in_opens_at'));
+    }
+
     public function test_cannot_process_before_last_time_out_closes(): void
     {
         $event = $this->dayEvent();

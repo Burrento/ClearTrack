@@ -23,8 +23,15 @@
 {{-- Actions, in the order an officer uses them --}}
 <section class="panel panel-body mb-10" aria-label="Event actions">
     <div class="flex flex-wrap gap-3">
+        @php $nextToOpen = $event->sessions->first(fn ($s) => $s->inOpensAt()->isFuture()); @endphp
         @if($event->isOpenForAttendance())
             <a href="{{ route('attendance.rfid', $event) }}" class="btn btn-primary btn-lg">Open RFID scanner</a>
+        @elseif(!$event->fines_processed && $nextToOpen)
+            <form action="{{ route('events.startEarly', $event) }}" method="POST"
+                onsubmit="return confirm(@js('Start ' . strtolower($nextToOpen->label()) . ' attendance now? Time in opens immediately instead of at ' . $nextToOpen->inOpensAt()->format('g:i A') . '. Taps before ' . $nextToOpen->starts_at->format('g:i A') . ' count as on time.'))">
+                @csrf
+                <button type="submit" class="btn btn-primary btn-lg">Start attendance now</button>
+            </form>
         @endif
 
         @if($event->survey)
@@ -41,8 +48,11 @@
             </form>
         @endunless
     </div>
+    @if(!$event->fines_processed && !$event->isOpenForAttendance() && $nextToOpen)
+        <p class="hint mt-4">{{ $nextToOpen->label() }} time in normally opens at {{ $nextToOpen->inOpensAt()->format('g:i A') }}{{ $nextToOpen->inOpensAt()->isToday() ? '' : ' on ' . $nextToOpen->inOpensAt()->format('M j') }}. Start it now if students arrive early.</p>
+    @endif
     @if(!$event->fines_processed)
-        <p class="hint mt-4">
+        <p class="hint mt-2">
             @if($event->closesAt()->isFuture())
                 Absences can be processed after the last time out closes at {{ $event->closesAt()->format('g:i A') }}.
             @else

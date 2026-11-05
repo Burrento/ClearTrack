@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * One part of an event day (morning, afternoon or evening) that students tap in to and out of.
  *
- * Time in:  from 1 hour before the start until 30 min before the end; after the start it's late.
+ * Time in:  from 1 hour before the start (or earlier, if an officer started attendance early) until
+ *           30 min before the end; after the start it's late.
  * Time out: from 30 min before the end until 30 min after it.
  */
-#[Fillable(['event_id', 'name', 'starts_at', 'ends_at'])]
+#[Fillable(['event_id', 'name', 'starts_at', 'ends_at', 'in_opens_at'])]
 class EventSession extends Model
 {
     public const NAMES = ['morning', 'afternoon', 'evening'];
@@ -21,7 +22,7 @@ class EventSession extends Model
 
     protected function casts(): array
     {
-        return ['starts_at' => 'datetime', 'ends_at' => 'datetime'];
+        return ['starts_at' => 'datetime', 'ends_at' => 'datetime', 'in_opens_at' => 'datetime'];
     }
 
     public function event()
@@ -53,7 +54,9 @@ class EventSession extends Model
 
     public function inOpensAt(): CarbonInterface
     {
-        return $this->starts_at->copy()->subMinutes(self::IN_OPENS_MINUTES_BEFORE);
+        $usual = $this->starts_at->copy()->subMinutes(self::IN_OPENS_MINUTES_BEFORE);
+
+        return $this->in_opens_at?->lt($usual) ? $this->in_opens_at->copy() : $usual;
     }
 
     public function outOpensAt(): CarbonInterface
