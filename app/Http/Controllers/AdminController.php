@@ -88,7 +88,7 @@ class AdminController extends Controller
         return back()->with('status', 'Officer added.');
     }
 
-    private const YEAR_LEVELS = ['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'];
+    private const YEAR_LEVELS = User::YEAR_LEVELS;
 
     public function semesters(): View
     {

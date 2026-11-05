@@ -21,6 +21,9 @@
                 <tr>
                     <td class="min-w-48 align-top">
                         <a href="{{ route('events.show', $event) }}" class="font-semibold hover:underline">{{ $event->name }}</a>
+                        @if($event->year_levels)
+                            <span class="mt-1 block text-sm text-ink-soft">{{ $event->audience() }}</span>
+                        @endif
                     </td>
                     <td class="align-top whitespace-nowrap">
                         <span class="block font-semibold">{{ $event->start_time->format('D, M j, Y') }}</span>

@@ -39,6 +39,7 @@ erDiagram
         bigint id PK
         bigint department_id FK
         string name
+        json year_levels "null = all year levels"
         datetime start_time
         datetime end_time
         decimal absent_fine "0 = no fine"

@@ -50,6 +50,22 @@
     </fieldset>
 
     <fieldset>
+        <legend class="label">Who must attend</legend>
+        @php $chosen = old('year_levels', $event?->year_levels ?? []); @endphp
+        <div class="flex flex-wrap gap-x-6 gap-y-2">
+            @foreach(\App\Models\User::YEAR_LEVELS as $level)
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="year_levels[]" value="{{ $level }}" class="checkbox" @checked(in_array($level, $chosen, true))>
+                    {{ $level }}
+                </label>
+            @endforeach
+        </div>
+        <p class="hint">Leave all unticked for every year level. Students of other year levels can't tap in and aren't fined.</p>
+        @error('year_levels') <p class="field-error">{{ $message }}</p> @enderror
+        @error('year_levels.*') <p class="field-error">{{ $message }}</p> @enderror
+    </fieldset>
+
+    <fieldset>
         <legend class="label">Fines, per session</legend>
         <div class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
             @foreach([

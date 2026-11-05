@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use App\Models\EventSession;
+use App\Models\User;
+use Illuminate\Validation\Rule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -232,6 +234,8 @@ class EventController extends Controller
             'name' => 'required|string|max:255',
             'date' => 'required|date',
             'requires_survey' => 'boolean',
+            'year_levels' => 'nullable|array',
+            'year_levels.*' => ['string', Rule::in(User::YEAR_LEVELS)],
             'absent_fine' => 'required|numeric|min:0|max:100000',
             'late_fine' => 'required|numeric|min:0|max:100000',
             'missed_in_fine' => 'required|numeric|min:0|max:100000',
@@ -281,6 +285,9 @@ class EventController extends Controller
         $validated['start_time'] = reset($held)['starts_at'];
         $validated['end_time'] = end($held)['ends_at'];
         $validated['requires_survey'] = $request->has('requires_survey');
+        // Nothing ticked, or every level ticked, means the event is for everyone
+        $levels = array_values(array_intersect(User::YEAR_LEVELS, $validated['year_levels'] ?? []));
+        $validated['year_levels'] = $levels && count($levels) < count(User::YEAR_LEVELS) ? $levels : null;
         unset($validated['date'], $validated['sessions']);
 
         return [$validated, $sessions];

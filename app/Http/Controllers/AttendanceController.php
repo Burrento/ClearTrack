@@ -41,6 +41,10 @@ class AttendanceController extends Controller
             return $this->scanError($request, 'Student not found or not in this department.');
         }
 
+        if (!$event->isFor($user)) {
+            return $this->scanError($request, "{$user->name} isn't expected here: this event is for {$event->audience()}.");
+        }
+
         if (!$event->isOpenForAttendance()) {
             return $this->scanError($request, 'Attendance is closed: the event is not running or absences were already processed.');
         }
@@ -109,7 +113,7 @@ class AttendanceController extends Controller
     public function studentEvents(): View
     {
         $user = Auth::user();
-        $events = Event::where('department_id', $user->department_id)
+        $events = Event::forStudent($user)
             ->orderBy('start_time', 'desc')
             ->get();
 

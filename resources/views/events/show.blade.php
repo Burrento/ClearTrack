@@ -31,6 +31,7 @@
 
 <div class="-mt-4 mb-8 space-y-1 text-ink-soft">
     <p class="flex flex-wrap items-center gap-x-4 gap-y-2"><x-event-phase :event="$event" /> {{ $event->schedule() }}</p>
+    <p>For: <strong class="text-ink">{{ $event->audience() }}</strong></p>
     <p>Fines per session: {{ $money($event->absent_fine) }} absent, {{ $money($event->late_fine) }} late,
         {{ $money($event->missed_in_fine) }} no time in, {{ $money($event->missed_out_fine) }} no time out.</p>
 </div>
@@ -38,7 +39,9 @@
 {{-- Actions, in the order an officer uses them --}}
 @php
     $open = !$event->fines_processed;
-    $endable = $open && $event->sessions->contains(fn ($s) => $s->canEndNow() || $s->canStartNow());
+    // Something is taking taps, or the day has begun and later sessions are still to come
+    $endable = $open && ($event->sessions->contains->canEndNow()
+        || ($event->sessions->contains(fn ($s) => !$s->canStartNow()) && $event->sessions->contains->canStartNow()));
 @endphp
 <section class="panel panel-body mb-6" aria-label="Event actions">
     <div class="flex flex-wrap gap-3">

@@ -87,7 +87,7 @@ class StudentController extends Controller
     /**
      * Accept serials typed with colons/dashes/spaces; store bare hex to match scans.
      */
-    private const YEAR_LEVELS = ['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'];
+    private const YEAR_LEVELS = User::YEAR_LEVELS;
     private const CSV_COLUMNS = ['name', 'student_id', 'year_level']; // cards are tapped in later with Edit
 
     /**

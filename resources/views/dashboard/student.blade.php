@@ -4,7 +4,7 @@
     $unpaidFines = $user->fines()->with('event')->where('status', 'unpaid')->get();
     $cleared = $unpaidFines->isEmpty();
 
-    $openEvents = \App\Models\Event::where('department_id', $user->department_id)->with('sessions')
+    $openEvents = \App\Models\Event::forStudent($user)->with('sessions')
         ->where('end_time', '>=', now()->subMinutes(\App\Models\EventSession::OUT_WINDOW_MINUTES))->where('fines_processed', false)->get()
         ->filter->isOpenForAttendance();
     $myTaps = $user->attendances()->whereIn('event_id', $openEvents->pluck('id'))->get()->keyBy('event_session_id');

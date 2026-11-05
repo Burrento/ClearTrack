@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
  * An event day with one to three sessions (see EventSession). start_time / end_time span all
  * sessions and are kept in step by EventController.
  */
-#[Fillable(['department_id', 'name', 'start_time', 'end_time', 'absent_fine', 'late_fine', 'missed_in_fine', 'missed_out_fine', 'requires_survey', 'fines_processed'])]
+#[Fillable(['department_id', 'name', 'year_levels', 'start_time', 'end_time', 'absent_fine', 'late_fine', 'missed_in_fine', 'missed_out_fine', 'requires_survey', 'fines_processed'])]
 class Event extends Model
 {
     protected static function booted(): void
@@ -62,6 +62,7 @@ class Event extends Model
             'late_fine' => 'decimal:2',
             'missed_in_fine' => 'decimal:2',
             'missed_out_fine' => 'decimal:2',
+            'year_levels' => 'array',
             'requires_survey' => 'boolean',
             'fines_processed' => 'boolean',
         ];
@@ -70,6 +71,43 @@ class Event extends Model
     /**
      * When the first time in opens (earlier if an officer started attendance early).
      */
+    /**
+     * The students this event is for: active students of its department, of its year levels
+     * if it has any (null year_levels = every year level).
+     */
+    public function attendees()
+    {
+        return User::role('student')->where('department_id', $this->department_id)->where('is_active', true)
+            ->when($this->year_levels, fn ($q, $levels) => $q->whereIn('year_level', $levels));
+    }
+
+    public function isFor(User $student): bool
+    {
+        return !$this->year_levels || in_array($student->year_level, $this->year_levels, true);
+    }
+
+    /**
+     * Events a student is expected at: every-year-level events plus those for their year level.
+     */
+    public function scopeForStudent($query, User $student)
+    {
+        return $query->where('department_id', $student->department_id)
+            ->where(fn ($q) => $q->whereNull('year_levels')->orWhereJsonContains('year_levels', $student->year_level));
+    }
+
+    /**
+     * "All year levels" or e.g. "Third Year and Fourth Year only".
+     */
+    public function audience(): string
+    {
+        if (!$this->year_levels) {
+            return 'All year levels';
+        }
+        $levels = collect(User::YEAR_LEVELS)->intersect($this->year_levels)->values(); // in school order
+
+        return ($levels->count() > 1 ? $levels->slice(0, -1)->implode(', ') . ' and ' . $levels->last() : $levels->first()) . ' only';
+    }
+
     public function checkInOpensAt()
     {
         return $this->sessions->map->inOpensAt()->min();
@@ -156,7 +194,7 @@ class Event extends Model
     public function markAbsentees(): array
     {
         return DB::transaction(function () {
-            $students = User::role('student')->where('department_id', $this->department_id)->where('is_active', true)->get();
+            $students = $this->attendees()->get();
             $rows = $this->attendances()->get()->groupBy('event_session_id');
             $semesterId = Semester::current()?->id;
             $counts = ['absent' => 0, 'late' => 0, 'missed_in' => 0, 'missed_out' => 0];

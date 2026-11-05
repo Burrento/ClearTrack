@@ -286,6 +286,53 @@ class EventSessionsTest extends TestCase
         $this->assertSame('Nurses Week, Day 1', $event->fresh()->name);
     }
 
+    public function test_event_for_specific_year_levels_only(): void
+    {
+        $this->student->update(['year_level' => 'First Year']);
+        $fourth = User::create(['name' => 'Fourth Student', 'username' => 'LGC22-400001', 'password' => 'x',
+            'department_id' => $this->student->department_id, 'year_level' => 'Fourth Year', 'rfid_uid' => 'CAFE4444']);
+        $fourth->assignRole('student');
+
+        $this->actingAs($this->officer)->post(route('events.store'), $this->form(
+            ['morning' => ['enabled' => '1', 'start' => '08:00', 'end' => '12:00']],
+            ['year_levels' => ['Fourth Year']],
+        ))->assertSessionHasNoErrors();
+        $event = Event::sole();
+        $this->assertSame(['Fourth Year'], $event->year_levels);
+        $this->assertSame('Fourth Year only', $event->audience());
+
+        // The scanner refuses other year levels and records nothing
+        $this->tapAt($event, '07:55')->assertStatus(422)->assertJson(['message' => "{$this->student->name} isn't expected here: this event is for Fourth Year only."]);
+        $this->tapAt($event, '07:56', $fourth)->assertJson(['action' => 'in', 'status' => 'present']);
+        $this->assertNull($this->row($event, 'morning'));
+
+        // Students only see events meant for them
+        $this->actingAs($this->student)->get(route('student.events'))->assertDontSee('Nurses Week, Day 1');
+        $this->actingAs($fourth)->get(route('student.events'))->assertSee('Nurses Week, Day 1');
+
+        // Processing only concerns Fourth Year
+        $this->travelTo($this->day->copy()->setTime(12, 31));
+        $event->markAbsentees();
+        $this->assertSame(0, Attendance::where('user_id', $this->student->id)->count());
+        $this->assertSame(['No time out (morning)'], Fine::pluck('reason')->all()); // the Fourth Year student never tapped out
+    }
+
+    public function test_year_levels_none_or_all_means_everyone_and_bad_levels_are_rejected(): void
+    {
+        $this->actingAs($this->officer);
+        $morning = ['morning' => ['enabled' => '1', 'start' => '08:00', 'end' => '12:00']];
+
+        $this->post(route('events.store'), $this->form($morning))->assertSessionHasNoErrors();
+        $this->post(route('events.store'), $this->form($morning, ['year_levels' => User::YEAR_LEVELS]))->assertSessionHasNoErrors();
+        $this->assertSame([null, null], Event::pluck('year_levels')->all());
+        $this->assertSame('All year levels', Event::first()->audience());
+
+        $this->post(route('events.store'), $this->form($morning, ['year_levels' => ['Sixth Year']]))->assertSessionHasErrors('year_levels.0');
+
+        $this->post(route('events.store'), $this->form($morning, ['year_levels' => ['Fourth Year', 'Second Year']]))->assertSessionHasNoErrors();
+        $this->assertSame('Second Year and Fourth Year only', Event::latest('id')->first()->audience());
+    }
+
     public function test_cannot_process_before_last_time_out_closes(): void
     {
         $event = $this->dayEvent();
