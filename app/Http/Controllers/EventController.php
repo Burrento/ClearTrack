@@ -62,9 +62,14 @@ class EventController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Event $event): View
+    public function edit(Event $event): View|RedirectResponse
     {
         $this->authorizeDepartment($event->department_id);
+
+        if ($event->fines_processed) {
+            return $this->lockedAfterProcessing($event);
+        }
+
         return view('events.edit', compact('event'));
     }
 
@@ -74,6 +79,10 @@ class EventController extends Controller
     public function update(Request $request, Event $event): RedirectResponse
     {
         $this->authorizeDepartment($event->department_id);
+
+        if ($event->fines_processed) {
+            return $this->lockedAfterProcessing($event);
+        }
 
         [$validated, $sessions] = $this->validateEvent($request, $event);
 
@@ -165,6 +174,15 @@ class EventController extends Controller
 
         return redirect()->route('events.show', $event)
             ->with('status', 'Event ended. ' . $parts->implode('; ') . '. You can process absences now.');
+    }
+
+    /**
+     * Fines were charged from this event's times and amounts, so it is a record now, not a draft.
+     */
+    private function lockedAfterProcessing(Event $event): RedirectResponse
+    {
+        return redirect()->route('events.show', $event)
+            ->with('error', "{$event->name} can't be edited because its absences have been processed and fines were charged.");
     }
 
     private function authorizeSession(Event $event, EventSession $session): void

@@ -11,7 +11,9 @@
 @endphp
 
 <x-page-header :title="$event->name" :back="route('events.index')" back-label="Events">
-    <a href="{{ route('events.edit', $event) }}" class="btn btn-secondary">Edit event</a>
+    @unless($event->fines_processed)
+        <a href="{{ route('events.edit', $event) }}" class="btn btn-secondary">Edit event</a>
+    @endunless
 </x-page-header>
 
 <div class="-mt-4 mb-8 space-y-1 text-ink-soft">

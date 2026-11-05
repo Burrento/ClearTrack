@@ -270,6 +270,22 @@ class EventSessionsTest extends TestCase
         $this->assertNull($this->sessionOf($event, 'morning')->in_opens_at);
     }
 
+    public function test_processed_event_can_no_longer_be_edited(): void
+    {
+        $event = $this->dayEvent();
+        $this->travelTo($this->day->copy()->setTime(17, 31));
+        $this->actingAs($this->officer)->get(route('events.show', $event))->assertSee('Edit event');
+
+        $this->post(route('events.processFines', $event));
+
+        $this->get(route('events.show', $event))->assertDontSee('Edit event');
+        $this->get(route('events.index'))->assertDontSee(route('events.edit', $event));
+        $this->get(route('events.edit', $event))->assertRedirect(route('events.show', $event))->assertSessionHas('error');
+        $this->put(route('events.update', $event), $this->form(['morning' => ['enabled' => '1', 'start' => '09:00', 'end' => '12:00']], ['name' => 'Renamed']))
+            ->assertSessionHas('error');
+        $this->assertSame('Nurses Week, Day 1', $event->fresh()->name);
+    }
+
     public function test_cannot_process_before_last_time_out_closes(): void
     {
         $event = $this->dayEvent();
