@@ -164,8 +164,10 @@ class EventController extends Controller
             $this->syncTimes($event);
         });
 
-        $parts = $running->map(fn ($s) => "{$s->label()} time out is open until {$s->outClosesAt()->format('g:i A')}")
-            ->merge($notStarted->isEmpty() ? [] : [$notStarted->map->label()->implode(' and ') . ' cancelled']);
+        // toBase(): these hold strings, which an Eloquent collection can't merge
+        $parts = $running->merge($notStarted->diff($cancelled))->toBase()
+            ->map(fn ($s) => "{$s->label()} time out is open until {$s->outClosesAt()->format('g:i A')}")
+            ->merge($cancelled->isEmpty() ? [] : [$cancelled->map->label()->implode(' and ') . ' cancelled']);
 
         return redirect()->route('events.show', $event)->with('status', 'Event ended early. ' . $parts->implode('; ') . '.');
     }

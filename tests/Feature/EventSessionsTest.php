@@ -211,6 +211,22 @@ class EventSessionsTest extends TestCase
         $this->assertSame(0, \App\Models\Fine::count()); // tapped in and out of the only remaining session
     }
 
+    public function test_ending_an_event_with_no_session_running_yet(): void
+    {
+        // Morning started early at 6:00 and has a tap, but it's before 8:00 so nothing is "running"
+        $event = $this->dayEvent();
+        $this->travelTo($this->day->copy()->setTime(6, 0));
+        $this->actingAs($this->officer)->post(route('events.sessions.start', [$event, $this->sessionOf($event, 'morning')]));
+        $this->tapAt($event, '06:10');
+
+        $this->post(route('events.end', $event))
+            ->assertRedirect(route('events.show', $event))
+            ->assertSessionHas('status', 'Event ended early. Morning time out is open until 6:40 AM; Afternoon cancelled.');
+
+        $this->assertSame(['morning'], $event->fresh()->sessions->pluck('name')->all());
+        $this->tapAt($event, '06:15')->assertJson(['action' => 'out', 'session' => 'Morning']);
+    }
+
     public function test_ending_an_event_that_has_not_started_is_refused(): void
     {
         $event = $this->dayEvent();
