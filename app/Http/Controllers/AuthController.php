@@ -24,7 +24,13 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
-        if (Auth::attempt($credentials + ['is_active' => true], $request->boolean('remember'))) {
+        // Deactivated users and users of an archived department are refused like a wrong password
+        $allowed = $credentials + [
+            'is_active' => true,
+            fn ($query) => $query->whereDoesntHave('department', fn ($d) => $d->whereNotNull('archived_at')),
+        ];
+
+        if (Auth::attempt($allowed, $request->boolean('remember'))) {
             $request->session()->regenerate();
 
             return redirect()->intended('dashboard');

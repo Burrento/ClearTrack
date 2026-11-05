@@ -59,5 +59,6 @@ class PagesRenderTest extends TestCase
         foreach (['dashboard', 'admin.semesters', 'admin.departments', 'admin.officers', 'settings'] as $route) {
             $this->get(route($route))->assertOk();
         }
+        $this->get(route('admin.departments.edit', $officer->department))->assertOk();
     }
 }

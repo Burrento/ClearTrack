@@ -29,9 +29,12 @@
                 @forelse($departments as $department)
                     <tr>
                         <td class="font-bold">{{ $department->code }}</td>
-                        <td>{{ $department->name }}</td>
-                        <td @class(['text-alarm font-semibold' => !$department->officer_count])>
-                            {{ $department->officer_count ?: 'None assigned' }}
+                        <td>
+                            {{ $department->name }}
+                            @if($department->archived_at) <x-badge tone="muted">Archived</x-badge> @endif
+                        </td>
+                        <td @class(['text-alarm font-semibold' => !$department->officer_count && !$department->archived_at])>
+                            {{ $department->officer_count ?: ($department->archived_at ? '0' : 'None assigned') }}
                         </td>
                         <td>{{ $department->student_count }}</td>
                     </tr>

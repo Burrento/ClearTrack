@@ -32,6 +32,7 @@ erDiagram
         bigint id PK
         string name
         string code UK
+        timestamp archived_at "nullable; archived, never deleted"
         timestamps created_at_updated_at
     }
 

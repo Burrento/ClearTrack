@@ -69,6 +69,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::get('admin/departments', [AdminController::class, 'departments'])->name('admin.departments');
         Route::post('admin/departments', [AdminController::class, 'storeDepartment']);
+        Route::get('admin/departments/{department}/edit', [AdminController::class, 'editDepartment'])->name('admin.departments.edit');
+        Route::put('admin/departments/{department}', [AdminController::class, 'updateDepartment'])->name('admin.departments.update');
+        Route::post('admin/departments/{department}/archive', [AdminController::class, 'toggleArchive'])->name('admin.departments.toggleArchive');
         Route::get('admin/officers', [AdminController::class, 'officers'])->name('admin.officers');
         Route::post('admin/officers', [AdminController::class, 'storeOfficer']);
         Route::get('admin/semesters', [AdminController::class, 'semesters'])->name('admin.semesters');

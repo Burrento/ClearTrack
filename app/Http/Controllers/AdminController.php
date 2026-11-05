@@ -33,10 +33,38 @@ class AdminController extends Controller
         return back()->with('status', 'Department added.');
     }
 
+    public function editDepartment(Department $department): View
+    {
+        return view('admin.departments-edit', compact('department'));
+    }
+
+    public function updateDepartment(Request $request, Department $department): RedirectResponse
+    {
+        $department->update($request->validate([
+            'name' => 'required|string|max:255',
+            'code' => ['required', 'string', Rule::unique('departments')->ignore($department->id)],
+        ]));
+
+        return redirect()->route('admin.departments')->with('status', 'Changes saved.');
+    }
+
+    /**
+     * Archive instead of delete: deleting would cascade away events and attendance. Archived
+     * departments' users can't log in (AuthController::login); restoring brings everything back.
+     */
+    public function toggleArchive(Department $department): RedirectResponse
+    {
+        $department->update(['archived_at' => $department->archived_at ? null : now()]);
+
+        return back()->with('status', $department->archived_at
+            ? "{$department->name} archived. Its officers and students can't log in."
+            : "{$department->name} restored.");
+    }
+
     public function officers(): View
     {
         $officers = User::role('officer')->with('department')->get();
-        $departments = Department::all();
+        $departments = Department::active()->get();
         return view('admin.officers', compact('officers', 'departments'));
     }
 
@@ -46,7 +74,7 @@ class AdminController extends Controller
             'name' => 'required|string|max:255',
             'username' => 'required|string|unique:users,username',
             'password' => 'required|min:8',
-            'department_id' => 'required|exists:departments,id',
+            'department_id' => ['required', Rule::exists('departments', 'id')->whereNull('archived_at')],
         ]);
 
         $user = User::create([
@@ -89,7 +117,7 @@ class AdminController extends Controller
 
             ClearancePeriod::query()->update(['status' => 'inactive']);
 
-            foreach (Department::all() as $department) {
+            foreach (Department::active()->get() as $department) {
                 $previous = ClearancePeriod::where('department_id', $department->id)->latest('id')->first();
 
                 if ($previous) {
