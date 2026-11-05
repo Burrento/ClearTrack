@@ -53,11 +53,14 @@ function scanner(form) {
         show('bg-alarm', 'Not recorded', message, null, 'text-[clamp(1.75rem,4.5vw,3rem)] leading-[1.1]');
     };
 
-    const addRecent = ({ name, status, at }) => {
+    const badge = (className, textContent) => Object.assign(document.createElement('span'), { className, textContent });
+
+    const addRecent = ({ name, status, at, action, session }) => {
         const item = document.createElement('li');
         item.className = 'flex items-center justify-between gap-4 px-5 py-3';
         const right = Object.assign(document.createElement('span'), { className: 'flex items-center gap-3 text-sm text-ink-soft' });
-        if (status === 'late') right.append(Object.assign(document.createElement('span'), { className: 'badge badge-wait', textContent: 'Late' }));
+        right.append(badge('badge badge-muted', `${session} ${action}`));
+        if (action === 'in' && status === 'late') right.append(badge('badge badge-wait', 'Late'));
         right.append(at.replace(/:\d\d /, ' ')); // 9:41:07 AM → 9:41 AM, like the server-rendered rows
         item.append(Object.assign(document.createElement('span'), { className: 'font-semibold', textContent: name }), right);
         recent.prepend(item);
@@ -83,17 +86,19 @@ function scanner(form) {
         if (response.status === 419) return fail('This page has expired. Refresh the page, then tap again.');
         if (!response.ok) return fail(data.message || 'Something went wrong. Tap again.');
 
-        const late = data.status === 'late';
-        beep(data.repeat ? 'repeat' : late ? 'late' : 'ok');
-        show(
-            late ? 'bg-wait' : 'bg-seal',
-            data.repeat ? 'Already recorded' : late ? 'Late' : 'Present',
-            data.name,
-            data.repeat ? `${late ? 'Late' : 'Present'}, tapped at ${data.at}` : `Recorded at ${data.at}`,
-        );
+        // Same wording and colours as the server-rendered result in attendance/rfid.blade.php
+        const [colour, label, tone] = data.repeat ? ['bg-ink-soft', 'Already recorded', 'repeat']
+            : data.action === 'out' ? ['bg-seal-deep', 'Time out', 'out']
+            : data.status === 'late' ? ['bg-wait', 'Late time in', 'late']
+            : ['bg-seal', 'Time in', 'ok'];
+        beep(tone);
+        show(colour, label, data.name, `${data.session}, ${data.at}`);
         if (!data.repeat) addRecent(data);
-        for (const [key, total] of Object.entries(data.counts)) {
-            document.querySelector(`[data-count="${key}"]`).textContent = total;
+        for (const [session, counts] of Object.entries(data.counts)) {
+            for (const [key, total] of Object.entries(counts)) {
+                const el = document.querySelector(`[data-count="${session}-${key}"]`);
+                if (el) el.textContent = total;
+            }
         }
     };
 
@@ -108,7 +113,13 @@ function sound(toggle) {
     let audio = null;
     let on = false;
     // [frequency Hz, seconds] per note
-    const tones = { ok: [[1047, 0.12]], late: [[784, 0.1], [784, 0.1]], repeat: [[1047, 0.05]], error: [[196, 0.4]] };
+    const tones = {
+        ok: [[1047, 0.12]], // time in: one high beep
+        late: [[784, 0.1], [784, 0.1]], // late time in: two beeps
+        out: [[784, 0.08], [1047, 0.12]], // time out: low then high
+        repeat: [[1047, 0.05]], // already recorded: short blip
+        error: [[196, 0.4]], // not recorded: low buzz
+    };
 
     toggle?.addEventListener('click', () => {
         audio ??= new AudioContext();

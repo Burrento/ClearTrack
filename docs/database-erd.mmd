@@ -6,6 +6,8 @@ erDiagram
     USERS ||--o{ FINES : "incurs"
     USERS ||--o{ SURVEY_RESPONSES : "submits"
     USERS ||--o{ ATTENDANCES : "verifies"
+    EVENTS ||--o{ EVENT_SESSIONS : "has"
+    EVENT_SESSIONS ||--o{ ATTENDANCES : "records"
     EVENTS ||--o{ ATTENDANCES : "has"
     EVENTS ||--o{ FINES : "generates"
     EVENTS ||--o| SURVEYS : "requires"
@@ -41,6 +43,8 @@ erDiagram
         datetime end_time
         decimal absent_fine "0 = no fine"
         decimal late_fine "0 = no fine"
+        decimal missed_in_fine "0 = no fine"
+        decimal missed_out_fine "0 = no fine"
         boolean requires_survey
         boolean fines_processed
         timestamps created_at_updated_at
@@ -49,10 +53,22 @@ erDiagram
     ATTENDANCES {
         bigint id PK
         bigint event_id FK
+        bigint event_session_id FK "unique with user_id"
         bigint user_id FK
-        string status "present, late or absent"
+        string status "present, late, absent or missed_in"
+        timestamp time_in_at
+        timestamp time_out_at
         string photo_path
         bigint verified_by_id FK
+        timestamps created_at_updated_at
+    }
+
+    EVENT_SESSIONS {
+        bigint id PK
+        bigint event_id FK
+        string name "morning, afternoon or evening"
+        datetime starts_at
+        datetime ends_at
         timestamps created_at_updated_at
     }
 

@@ -21,7 +21,7 @@
                 <tr>
                     <td><a href="{{ route('events.show', $event) }}" class="font-semibold hover:underline">{{ $event->name }}</a></td>
                     <td class="whitespace-nowrap text-ink-soft">{{ $event->schedule() }}</td>
-                    <td class="whitespace-nowrap">₱{{ number_format($event->absent_fine, 2) }} absent<br><span class="text-ink-soft">₱{{ number_format($event->late_fine, 2) }} late</span></td>
+                    <td class="whitespace-nowrap">₱{{ number_format($event->absent_fine, 2) }} absent<br><span class="text-ink-soft">₱{{ number_format($event->late_fine, 2) }} late, ₱{{ number_format($event->missed_out_fine, 2) }} no time out</span></td>
                     <td><x-event-phase :event="$event" /></td>
                     <td>
                         <div class="flex justify-end gap-4">

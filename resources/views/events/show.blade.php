@@ -2,18 +2,22 @@
 
 @section('content')
 @php
-    $attendances = $event->attendances()->with('user')->latest('updated_at')->get();
-    $counts = $attendances->countBy('status');
+    $sessions = $event->sessions;
+    // One row per student, with that student's attendance per session
+    $byStudent = $event->attendances()->with('user')->get()->groupBy('user_id')
+        ->map(fn ($rows) => ['user' => $rows->first()->user, 'sessions' => $rows->keyBy('event_session_id')])
+        ->sortBy(fn ($r) => $r['user']->name);
+    $money = fn ($amount) => '₱' . number_format($amount, 2);
 @endphp
 
 <x-page-header :title="$event->name" :back="route('events.index')" back-label="Events">
     <a href="{{ route('events.edit', $event) }}" class="btn btn-secondary">Edit event</a>
 </x-page-header>
 
-<div class="-mt-4 mb-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-ink-soft">
-    <x-event-phase :event="$event" />
-    <span>{{ $event->schedule() }}</span>
-    <span>Fines: ₱{{ number_format($event->absent_fine, 2) }} if absent, ₱{{ number_format($event->late_fine, 2) }} if late</span>
+<div class="-mt-4 mb-8 space-y-1 text-ink-soft">
+    <p class="flex flex-wrap items-center gap-x-4 gap-y-2"><x-event-phase :event="$event" /> {{ $event->schedule() }}</p>
+    <p>Fines per session: {{ $money($event->absent_fine) }} absent, {{ $money($event->late_fine) }} late,
+        {{ $money($event->missed_in_fine) }} no time in, {{ $money($event->missed_out_fine) }} no time out.</p>
 </div>
 
 {{-- Actions, in the order an officer uses them --}}
@@ -31,58 +35,69 @@
 
         @unless($event->fines_processed)
             <form action="{{ route('events.processFines', $event) }}" method="POST" class="sm:ml-auto"
-                onsubmit="return confirm(@js('Mark every student who didn't tap in as absent and add fines: ₱' . number_format($event->absent_fine, 2) . ' per absent student, ₱' . number_format($event->late_fine, 2) . ' per late student?'))">
+                onsubmit="return confirm('Process absences now? Students who missed a session, came late or missed a time in or time out get this event\'s fines.')">
                 @csrf
-                <button type="submit" class="btn btn-danger btn-lg" @disabled($event->end_time->isFuture())>Process absences</button>
+                <button type="submit" class="btn btn-danger btn-lg" @disabled($event->closesAt()->isFuture())>Process absences</button>
             </form>
         @endunless
     </div>
     @if(!$event->fines_processed)
         <p class="hint mt-4">
-            @if($event->end_time->isFuture())
-                Absences can be processed after the event ends at {{ $event->endsAt() }}.
+            @if($event->closesAt()->isFuture())
+                Absences can be processed after the last time out closes at {{ $event->closesAt()->format('g:i A') }}.
             @else
-                Process absences to add fines for absent and late students. This also runs automatically a few minutes after the event ends.
+                Process absences to add the fines. This also runs automatically a few minutes after the last time out closes.
             @endif
         </p>
     @endif
 </section>
 
 <section aria-labelledby="log-heading">
-    <div class="mb-4 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="log-heading" class="panel-title">Attendance</h2>
-        <p class="text-ink-soft">
-            {{ $counts['present'] ?? 0 }} present, {{ $counts['late'] ?? 0 }} late, {{ $counts['absent'] ?? 0 }} absent
-        </p>
-    </div>
+    <h2 id="log-heading" class="panel-title mb-4">Attendance</h2>
     <div class="panel overflow-x-auto">
         <table class="data-table">
             <thead>
                 <tr>
                     <th>Student</th>
-                    <th>Status</th>
-                    <th>Recorded</th>
-                    <th>Method</th>
+                    @foreach($sessions as $session)
+                        <th>{{ $session->label() }} in</th>
+                        <th>{{ $session->label() }} out</th>
+                    @endforeach
                 </tr>
             </thead>
             <tbody>
-                @forelse($attendances as $attendance)
+                @forelse($byStudent as $row)
                     <tr>
-                        <td class="font-semibold">{{ $attendance->user->name }}</td>
-                        <td>
-                            @switch($attendance->status)
-                                @case('present') <x-badge tone="good">Present</x-badge> @break
-                                @case('late') <x-badge tone="wait">Late</x-badge> @break
-                                @default <x-badge tone="bad">{{ ucfirst($attendance->status) }}</x-badge>
-                            @endswitch
-                        </td>
-                        <td class="whitespace-nowrap text-ink-soft">{{ $attendance->updated_at->format('M j, g:i A') }}</td>
-                        <td class="text-ink-soft">
-                            {{ $attendance->verified_by_id ? 'RFID' : 'Automatic' }}
-                        </td>
+                        <td class="font-semibold whitespace-nowrap">{{ $row['user']->name }}</td>
+                        @foreach($sessions as $session)
+                            @php $a = $row['sessions']->get($session->id); @endphp
+                            @if(!$a || $a->status === 'absent')
+                                <td colspan="2">
+                                    @if($a) <x-badge tone="bad">Absent</x-badge> @else <span class="text-ink-soft">—</span> @endif
+                                </td>
+                            @else
+                                <td class="whitespace-nowrap">
+                                    @if($a->time_in_at)
+                                        {{ $a->time_in_at->format('g:i A') }}
+                                        @if($a->status === 'late') <x-badge tone="wait">Late</x-badge> @endif
+                                    @else
+                                        <x-badge tone="bad">No time in</x-badge>
+                                    @endif
+                                </td>
+                                <td class="whitespace-nowrap">
+                                    @if($a->time_out_at)
+                                        {{ $a->time_out_at->format('g:i A') }}
+                                    @elseif($event->fines_processed)
+                                        <x-badge tone="bad">No time out</x-badge>
+                                    @else
+                                        <span class="text-ink-soft">Not yet</span>
+                                    @endif
+                                </td>
+                            @endif
+                        @endforeach
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="empty">No attendance yet. The scanner opens 1 hour before the event starts.</td></tr>
+                    <tr><td colspan="{{ 1 + 2 * $sessions->count() }}" class="empty">No attendance yet. Time in opens 1 hour before each session starts.</td></tr>
                 @endforelse
             </tbody>
         </table>

@@ -52,17 +52,20 @@ class EventFinesTest extends TestCase
     {
         $this->actingAs($this->officer)->post(route('events.store'), [
             'name' => 'General assembly',
-            'start_time' => now()->addDay()->format('Y-m-d\TH:i'),
-            'end_time' => now()->addDay()->addHours(2)->format('Y-m-d\TH:i'),
+            'date' => now()->addDay()->toDateString(),
+            'sessions' => ['morning' => ['enabled' => '1', 'start' => '08:00', 'end' => '10:00']],
             'absent_fine' => '50',
             'late_fine' => '20.50',
+            'missed_in_fine' => '0',
+            'missed_out_fine' => '0',
         ])->assertSessionHasNoErrors()->assertRedirect(route('events.index'));
 
         $event = Event::sole();
         $this->assertSame('50.00', $event->absent_fine);
         $this->assertSame('20.50', $event->late_fine);
 
-        $this->post(route('events.store'), ['name' => 'Bad', 'start_time' => now(), 'end_time' => now()->addHour(), 'absent_fine' => -5, 'late_fine' => 0])
+        $this->post(route('events.store'), ['name' => 'Bad', 'date' => now()->toDateString(), 'sessions' => ['morning' => ['enabled' => '1', 'start' => '08:00', 'end' => '10:00']],
+            'absent_fine' => -5, 'late_fine' => 0, 'missed_in_fine' => 0, 'missed_out_fine' => 0])
             ->assertSessionHasErrors('absent_fine');
     }
 
@@ -71,14 +74,15 @@ class EventFinesTest extends TestCase
         $event = $this->endedEvent();
         $late = $this->student('LGC25-200001');
         $present = $this->student('LGC25-200002');
-        Attendance::create(['event_id' => $event->id, 'user_id' => $late->id, 'status' => 'late']);
-        Attendance::create(['event_id' => $event->id, 'user_id' => $present->id, 'status' => 'present']);
+        $session = $event->sessions->first();
+        Attendance::create(['event_id' => $event->id, 'event_session_id' => $session->id, 'user_id' => $late->id, 'status' => 'late', 'time_in_at' => now(), 'time_out_at' => now()]);
+        Attendance::create(['event_id' => $event->id, 'event_session_id' => $session->id, 'user_id' => $present->id, 'status' => 'present', 'time_in_at' => now(), 'time_out_at' => now()]);
 
         $this->actingAs($this->officer)->post(route('events.processFines', $event))
-            ->assertSessionHas('status', fn ($s) => str_contains($s, '1 absent and 1 late'));
+            ->assertSessionHas('status', fn ($s) => str_contains($s, '1 absent, 1 late'));
 
         $this->assertEquals(50, Fine::where('user_id', $this->student->id)->sole()->amount);
-        $this->assertSame('Absent', Fine::where('user_id', $this->student->id)->sole()->reason);
+        $this->assertStringStartsWith('Absent (', Fine::where('user_id', $this->student->id)->sole()->reason);
         $this->assertEquals(20, Fine::where('user_id', $late->id)->sole()->amount);
         $this->assertSame(0, Fine::where('user_id', $present->id)->count());
         $this->assertSame('late', Attendance::where('user_id', $late->id)->value('status')); // late stays late

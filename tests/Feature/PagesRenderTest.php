@@ -30,8 +30,9 @@ class PagesRenderTest extends TestCase
         $past = Event::create(['department_id' => $officer->department_id, 'name' => 'Seminar', 'start_time' => now()->subDays(3), 'end_time' => now()->subDays(3)->addHours(2), 'absent_fine' => 50]);
         $survey = Survey::create(['event_id' => $live->id, 'title' => 'Feedback']);
         $survey->questions()->create(['question_text' => 'How was it?']);
-        Attendance::create(['event_id' => $past->id, 'user_id' => $student->id, 'status' => 'absent']);
-        Attendance::create(['event_id' => $live->id, 'user_id' => $student->id, 'status' => 'late', 'verified_by_id' => $officer->id]);
+        Attendance::create(['event_id' => $past->id, 'event_session_id' => $past->sessions->first()->id, 'user_id' => $student->id, 'status' => 'absent']);
+        Attendance::create(['event_id' => $live->id, 'event_session_id' => $live->sessions->first()->id, 'user_id' => $student->id,
+            'status' => 'late', 'time_in_at' => now(), 'verified_by_id' => $officer->id]);
         Fine::create(['user_id' => $student->id, 'event_id' => $past->id, 'semester_id' => $semester->id, 'amount' => 50, 'status' => 'unpaid', 'reason' => 'Absent']);
 
         $this->get('/login')->assertOk();

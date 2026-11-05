@@ -2,17 +2,21 @@
 
 @section('content')
 @php
-    $recorded = $event->attendances()->whereIn('status', ['present', 'late']);
-    $recent = (clone $recorded)->with('user')->latest('updated_at')->take(8)->get();
-    $counts = (clone $recorded)->get()->countBy('status');
+    $sessions = $event->sessions;
+    $recent = $event->attendances()->where(fn ($q) => $q->whereNotNull('time_in_at')->orWhereNotNull('time_out_at'))
+        ->with('user', 'session')->latest('updated_at')->take(8)->get();
     $scan = session('scanned');
-    $late = ($scan['status'] ?? null) === 'late';
+
+    // Result screen wording and colour, shared with the JavaScript version in resources/js/app.js
+    $resultLook = fn ($s) => match (true) {
+        $s['repeat'] => ['bg-ink-soft', 'Already recorded'],
+        $s['action'] === 'out' => ['bg-seal-deep', 'Time out'],
+        $s['status'] === 'late' => ['bg-wait', 'Late time in'],
+        default => ['bg-seal', 'Time in'],
+    };
 @endphp
 
-<x-page-header :title="$event->name" :back="route('events.show', $event)" back-label="Event details"
-    :description="$event->start_time->isFuture()
-        ? 'Starts ' . $event->start_time->format('g:i A') . '. Taps after that count as late.'
-        : 'Started ' . $event->start_time->format('g:i A') . ', so taps now count as late. Ends ' . $event->endsAt() . '.'">
+<x-page-header :title="$event->name" :back="route('events.show', $event)" back-label="Event details">
     {{-- Browsers only allow sound after a click on the page, so the beep needs turning on once --}}
     <button type="button" data-sound-toggle aria-pressed="false" class="btn btn-secondary">Turn on beep</button>
 </x-page-header>
@@ -23,18 +27,43 @@
     <input type="hidden" name="rfid_uid" data-nfc data-nfc-submit>
 </form>
 
-<p class="mb-4 text-lg">
-    <strong data-count="present">{{ $counts['present'] ?? 0 }}</strong> present,
-    <strong data-count="late">{{ $counts['late'] ?? 0 }}</strong> late
-</p>
+{{-- Each session: what a tap records right now, and live counts --}}
+<ul class="mb-6 grid gap-3 sm:grid-cols-3">
+    @foreach($sessions as $session)
+        @php
+            $c = \App\Http\Controllers\AttendanceController::sessionCounts($session);
+            $open = $session->isInOpen() || $session->isOutOpen();
+        @endphp
+        <li @class(['panel px-4 py-3', 'border-seal ring-2 ring-seal/20' => $open])>
+            <p class="font-bold">{{ $session->label() }} <span class="font-normal text-ink-soft">{{ $session->times() }}</span></p>
+            <p @class(['text-sm', 'font-semibold text-seal-deep' => $open, 'text-ink-soft' => !$open])>
+                @if($session->isOutOpen())
+                    Time out open until {{ $session->outClosesAt()->format('g:i A') }}
+                @elseif($session->isInOpen())
+                    Time in open{{ $session->starts_at->isFuture() ? ', late after ' . $session->starts_at->format('g:i A') : ', taps now are late' }}
+                @elseif($session->inOpensAt()->isFuture())
+                    Time in opens {{ $session->inOpensAt()->format('g:i A') }}
+                @else
+                    Closed
+                @endif
+            </p>
+            <p class="mt-1">
+                <strong data-count="{{ $session->name }}-in">{{ $c['in'] }}</strong> in
+                (<span data-count="{{ $session->name }}-late">{{ $c['late'] }}</span> late),
+                <strong data-count="{{ $session->name }}-out">{{ $c['out'] }}</strong> out
+            </p>
+        </li>
+    @endforeach
+</ul>
 
 {{-- Scan result: sized to be read from across the table --}}
 <div data-scan-area aria-live="assertive">
     @if($scan)
-        <div data-scan-result @class(['rounded-2xl px-6 py-10 text-white sm:px-10 sm:py-14', 'bg-wait' => $late, 'bg-seal' => !$late])>
-            <p class="text-lg font-semibold text-white/80">{{ $scan['repeat'] ? 'Already recorded' : ($late ? 'Late' : 'Present') }}</p>
+        @php [$colour, $label] = $resultLook($scan); @endphp
+        <div data-scan-result class="rounded-2xl px-6 py-10 text-white sm:px-10 sm:py-14 {{ $colour }}">
+            <p class="text-lg font-semibold text-white/80">{{ $label }}</p>
             <p class="mt-1 text-[clamp(2.25rem,6vw,4rem)] leading-[1.05] font-bold tracking-tight">{{ $scan['name'] }}</p>
-            <p class="mt-3 text-white/80">{{ $scan['repeat'] ? ucfirst($scan['status']) . ', tapped at' : 'Recorded at' }} {{ $scan['at'] }}</p>
+            <p class="mt-3 text-white/80">{{ $scan['session'] }}, {{ $scan['at'] }}</p>
         </div>
     @endif
     @error('rfid_uid')
@@ -52,6 +81,7 @@
             </svg>
         </span>
         <p class="mt-5 text-2xl font-bold">Ready. Students can tap one after another.</p>
+        <p class="mt-1 text-ink-soft">The same tap records time in or time out, depending on which window is open.</p>
         <p id="nfc-status" class="reader-status mt-2">Connecting to the card reader…</p>
     </div>
 </div>
@@ -61,11 +91,13 @@
     <p data-recent-empty @class(['text-ink-soft', 'hidden' => $recent->isNotEmpty()])>No one yet.</p>
     <ul data-recent @class(['panel divide-y divide-rule', 'hidden' => $recent->isEmpty()])>
         @foreach($recent as $attendance)
+            @php $out = (bool) $attendance->time_out_at; @endphp
             <li class="flex items-center justify-between gap-4 px-5 py-3">
                 <span class="font-semibold">{{ $attendance->user->name }}</span>
                 <span class="flex items-center gap-3 text-sm text-ink-soft">
-                    @if($attendance->status === 'late') <x-badge tone="wait">Late</x-badge> @endif
-                    {{ $attendance->updated_at->format('g:i A') }}
+                    <span class="badge badge-muted">{{ $attendance->session?->label() }} {{ $out ? 'out' : 'in' }}</span>
+                    @if(!$out && $attendance->status === 'late') <x-badge tone="wait">Late</x-badge> @endif
+                    {{ ($out ? $attendance->time_out_at : $attendance->time_in_at)->format('g:i A') }}
                 </span>
             </li>
         @endforeach

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
+use App\Models\EventSession;
 use App\Models\User;
 use App\Models\Attendance;
 use Illuminate\Http\Request;
@@ -44,28 +45,57 @@ class AttendanceController extends Controller
             return $this->scanError($request, 'Attendance is closed: the event is not running or absences were already processed.');
         }
 
-        // First tap wins: tapping again later must not turn "present" into "late"
-        $attendance = Attendance::firstOrCreate(
-            ['event_id' => $event->id, 'user_id' => $user->id],
-            ['status' => $event->tapStatus(), 'verified_by_id' => Auth::id()]
+        // Which session and whether this is a time in or a time out comes from the open windows
+        [$session, $action] = $event->resolveTap($user);
+
+        // ponytail: two readers tapping the same card in the same instant can hit the unique index; tap again
+        $attendance = Attendance::firstOrNew(
+            ['event_session_id' => $session->id, 'user_id' => $user->id],
+            ['event_id' => $event->id, 'status' => 'missed_in']
         );
+
+        if ($action === 'in') {
+            $attendance->fill([
+                'status' => now()->gt($session->starts_at) ? 'late' : 'present',
+                'time_in_at' => now(),
+                'verified_by_id' => Auth::id(),
+            ])->save();
+        } elseif ($action === 'out') {
+            $attendance->fill(['time_out_at' => now(), 'verified_by_id' => Auth::id()])->save();
+        }
+
+        $lastTap = $action === 'in' ? $attendance->time_in_at
+            : ($action === 'out' ? $attendance->time_out_at : ($attendance->time_out_at ?? $attendance->time_in_at));
 
         $scan = [
             'name' => $user->name,
+            'session' => $session->label(),
+            'action' => $action,
             'status' => $attendance->status,
-            'repeat' => !$attendance->wasRecentlyCreated,
-            'at' => $attendance->created_at->format('g:i:s A'),
+            'repeat' => $action === 'repeat',
+            'at' => $lastTap?->format('g:i:s A'),
         ];
 
         if ($request->wantsJson()) {
-            $counts = $event->attendances()->whereIn('status', ['present', 'late'])
-                ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
-
-            return response()->json($scan + ['counts' => ['present' => $counts['present'] ?? 0, 'late' => $counts['late'] ?? 0]]);
+            return response()->json($scan + ['counts' => [$session->name => $this->sessionCounts($session)]]);
         }
 
         // Shown full-width on the scanner page rather than as the generic status flash
         return back()->with('scanned', $scan);
+    }
+
+    /**
+     * Tapped in (late included), late, and tapped out, for the scanner page's live counts.
+     */
+    public static function sessionCounts(EventSession $session): array
+    {
+        $rows = $session->attendances();
+
+        return [
+            'in' => (clone $rows)->whereNotNull('time_in_at')->count(),
+            'late' => (clone $rows)->where('status', 'late')->count(),
+            'out' => (clone $rows)->whereNotNull('time_out_at')->count(),
+        ];
     }
 
     private function scanError(Request $request, string $message): RedirectResponse|JsonResponse

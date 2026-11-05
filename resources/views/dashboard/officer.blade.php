@@ -3,7 +3,7 @@
     $semester = \App\Models\Semester::current();
 
     $events = \App\Models\Event::where('department_id', $departmentId)
-        ->withCount(['attendances as present_count' => fn ($q) => $q->where('status', 'present')])->get();
+        ->withCount(['attendances as tapped_in_count' => fn ($q) => $q->whereNotNull('time_in_at')])->get();
 
     $live = $events->filter(fn ($e) => $e->phase() === 'live');
     $next = $events->filter(fn ($e) => $e->phase() === 'upcoming')->sortBy('start_time')->first();
@@ -29,7 +29,7 @@
         <div class="panel mb-3 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-seal px-5 py-4">
             <div>
                 <p class="text-lg font-bold">{{ $event->name }}</p>
-                <p class="text-ink-soft">Until {{ $event->endsAt() }}. {{ $event->present_count }} present so far.</p>
+                <p class="text-ink-soft">Until {{ $event->endsAt() }}. {{ $event->tapped_in_count }} {{ \Illuminate\Support\Str::plural('time in', $event->tapped_in_count) }} so far.</p>
             </div>
             <a href="{{ route('attendance.rfid', $event) }}" class="btn btn-primary">Open scanner</a>
         </div>

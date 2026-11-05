@@ -124,13 +124,15 @@ class AttendanceSecurityTest extends TestCase
         $event = $this->event(['start_time' => now()->addMinutes(30), 'end_time' => now()->addHours(2)]);
         $tap = fn ($uid) => $this->actingAs($this->officer)->postJson(route('attendance.logRfid', $event), ['rfid_uid' => $uid]);
 
+        $session = $event->sessions->first()->name;
         $tap($this->student->rfid_uid)->assertOk()->assertJson([
             'name' => $this->student->name,
+            'action' => 'in',
             'status' => 'present',
             'repeat' => false,
-            'counts' => ['present' => 1, 'late' => 0],
+            'counts' => [$session => ['in' => 1, 'late' => 0, 'out' => 0]],
         ]);
-        $tap($this->student->rfid_uid)->assertOk()->assertJson(['repeat' => true, 'counts' => ['present' => 1]]);
+        $tap($this->student->rfid_uid)->assertOk()->assertJson(['repeat' => true, 'counts' => [$session => ['in' => 1]]]);
         $tap('FFFFFFFF')->assertStatus(422)->assertJson(['message' => 'Student not found or not in this department.']);
 
         $other = $this->event(['department_id' => Department::where('code', 'SOA')->value('id')]);

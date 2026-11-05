@@ -4,10 +4,10 @@
     $unpaidFines = $user->fines()->with('event')->where('status', 'unpaid')->get();
     $cleared = $unpaidFines->isEmpty();
 
-    $openEvents = \App\Models\Event::where('department_id', $user->department_id)
-        ->where('end_time', '>=', now())->where('fines_processed', false)->get()
-        ->filter->isOpenForAttendance()
-        ->reject(fn ($event) => $user->attendances()->where('event_id', $event->id)->exists());
+    $openEvents = \App\Models\Event::where('department_id', $user->department_id)->with('sessions')
+        ->where('end_time', '>=', now()->subMinutes(\App\Models\EventSession::OUT_WINDOW_MINUTES))->where('fines_processed', false)->get()
+        ->filter->isOpenForAttendance();
+    $myTaps = $user->attendances()->whereIn('event_id', $openEvents->pluck('id'))->get()->keyBy('event_session_id');
 @endphp
 
 <x-page-header :title="'Hello, ' . \Illuminate\Support\Str::before($user->name, ' ')" :description="$semester ? 'Your clearance for ' . $semester->name . '.' : 'Your clearance status.'" />
@@ -49,13 +49,21 @@
 @foreach($openEvents as $event)
     <section class="mt-6 rounded-xl border-2 border-seal bg-seal-wash px-5 py-4">
         <p class="font-bold">{{ $event->name }}: tap your ID at the officer's table</p>
-        <p class="text-ink-soft">
-            @if($event->start_time->isFuture())
-                Starts {{ $event->start_time->format('g:i A') }}. Tap in before then to avoid a late fine.
-            @else
-                Started {{ $event->start_time->format('g:i A') }}, so tapping in now counts as late. Ends {{ $event->endsAt() }}.
-            @endif
-        </p>
+        @foreach($event->sessions->filter(fn ($s) => $s->isInOpen() || $s->isOutOpen()) as $session)
+            @php $a = $myTaps->get($session->id); @endphp
+            <p class="text-ink-soft">
+                <strong class="text-ink">{{ $session->label() }}:</strong>
+                @if($session->isOutOpen())
+                    {{ $a?->time_out_at ? 'you tapped out at ' . $a->time_out_at->format('g:i A') . '. Done.' : 'tap out before ' . $session->outClosesAt()->format('g:i A') . '.' }}
+                @elseif($a?->time_in_at)
+                    you tapped in at {{ $a->time_in_at->format('g:i A') }}. Tap out from {{ $session->outOpensAt()->format('g:i A') }} to {{ $session->outClosesAt()->format('g:i A') }}.
+                @elseif($session->starts_at->isFuture())
+                    tap in before {{ $session->starts_at->format('g:i A') }} to avoid a late fine.
+                @else
+                    tap in now. It started at {{ $session->starts_at->format('g:i A') }}, so it counts as late.
+                @endif
+            </p>
+        @endforeach
     </section>
 @endforeach
 
