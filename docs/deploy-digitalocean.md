@@ -2,7 +2,17 @@
 
 This is how the live pilot server was set up. One small server runs everything: Nginx, PHP 8.3, MySQL and the scheduler. The card reader bridge always runs on the officer's laptop, not on the server.
 
-Live pilot: `https://178.128.57.54.sslip.io` (Droplet IP `178.128.57.54`). For a new server, replace the IP everywhere below. `<ip>.sslip.io` resolves to that IP automatically, so no domain is needed. To move to a real domain later, change `server_name` in Nginx, rerun certbot with the new name, update `APP_URL`, and run `php artisan config:cache`.
+Live pilot: **`https://lgc-cleartrack.duckdns.org`** (Droplet IP `178.128.57.54`; `https://178.128.57.54.sslip.io` also still works). The commands below use the sslip.io name they were first run with. For a new server, replace the IP everywhere. `<ip>.sslip.io` resolves to that IP automatically, so no domain is needed.
+
+**Adding a domain** (done for the free DuckDNS name: sign in at duckdns.org, add the subdomain, set its IP to the Droplet's):
+
+1. Add the name to every `server_name` line in `/etc/nginx/sites-available/cleartrack`, then reload Nginx. Certbot can't attach a certificate to a name Nginx doesn't list.
+2. Reissue the certificate for both names:
+   ```bash
+   certbot --nginx --reinstall --expand -d 178.128.57.54.sslip.io -d <name> --redirect
+   ```
+3. Set `APP_URL=https://<name>` in `.env`, then run `php artisan config:cache` as `cleartrack`.
+4. Start the card reader bridge with the new address. It accepts only one origin, so officers must use that same address.
 
 ## 1. Droplet
 
@@ -180,7 +190,7 @@ scp "root@178.128.57.54:/home/cleartrack/backups/*.gz" .
 ## 8. Card reader (officer's laptop)
 
 ```bash
-python tools/acr122u_bridge.py https://178.128.57.54.sslip.io
+python tools/acr122u_bridge.py https://lgc-cleartrack.duckdns.org
 ```
 
 The address must match the browser's address bar exactly: `https`, no trailing slash. Allow the browser's "local network" or "localhost" prompt. Brave may block localhost silently; allow it in Shields, or use Chrome.
