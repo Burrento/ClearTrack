@@ -119,6 +119,24 @@ class AttendanceSecurityTest extends TestCase
         $this->assertSame('late', $this->attendanceStatus($started, $this->student));
     }
 
+    public function test_scanner_page_records_taps_as_json_without_reloading(): void
+    {
+        $event = $this->event(['start_time' => now()->addMinutes(30), 'end_time' => now()->addHours(2)]);
+        $tap = fn ($uid) => $this->actingAs($this->officer)->postJson(route('attendance.logRfid', $event), ['rfid_uid' => $uid]);
+
+        $tap($this->student->rfid_uid)->assertOk()->assertJson([
+            'name' => $this->student->name,
+            'status' => 'present',
+            'repeat' => false,
+            'counts' => ['present' => 1, 'late' => 0],
+        ]);
+        $tap($this->student->rfid_uid)->assertOk()->assertJson(['repeat' => true, 'counts' => ['present' => 1]]);
+        $tap('FFFFFFFF')->assertStatus(422)->assertJson(['message' => 'Student not found or not in this department.']);
+
+        $other = $this->event(['department_id' => Department::where('code', 'SOA')->value('id')]);
+        $this->postJson(route('attendance.logRfid', $other), ['rfid_uid' => $this->student->rfid_uid])->assertForbidden();
+    }
+
     public function test_tapping_again_keeps_the_first_status(): void
     {
         $event = $this->event(['start_time' => now()->addMinutes(30), 'end_time' => now()->addHours(2)]);

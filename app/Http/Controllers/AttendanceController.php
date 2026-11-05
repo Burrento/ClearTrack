@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Attendance;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -18,7 +19,11 @@ class AttendanceController extends Controller
         return view('attendance.rfid', compact('event'));
     }
 
-    public function logRfid(Request $request, Event $event): RedirectResponse
+    /**
+     * Records a tap. The scanner page posts JSON (no reload, so taps aren't lost while a page
+     * loads); a plain form post still works and redirects back.
+     */
+    public function logRfid(Request $request, Event $event): RedirectResponse|JsonResponse
     {
         $this->authorizeDepartment($event->department_id);
 
@@ -32,11 +37,11 @@ class AttendanceController extends Controller
             ->first();
 
         if (!$user) {
-            return back()->withErrors(['rfid_uid' => 'Student not found or not in this department.']);
+            return $this->scanError($request, 'Student not found or not in this department.');
         }
 
         if (!$event->isOpenForAttendance()) {
-            return back()->withErrors(['rfid_uid' => 'Attendance is closed: the event is not running or absences were already processed.']);
+            return $this->scanError($request, 'Attendance is closed: the event is not running or absences were already processed.');
         }
 
         // First tap wins: tapping again later must not turn "present" into "late"
@@ -45,13 +50,29 @@ class AttendanceController extends Controller
             ['status' => $event->tapStatus(), 'verified_by_id' => Auth::id()]
         );
 
-        // Shown full-width on the scanner page rather than as the generic status flash
-        return back()->with('scanned', [
+        $scan = [
             'name' => $user->name,
             'status' => $attendance->status,
             'repeat' => !$attendance->wasRecentlyCreated,
             'at' => $attendance->created_at->format('g:i:s A'),
-        ]);
+        ];
+
+        if ($request->wantsJson()) {
+            $counts = $event->attendances()->whereIn('status', ['present', 'late'])
+                ->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+
+            return response()->json($scan + ['counts' => ['present' => $counts['present'] ?? 0, 'late' => $counts['late'] ?? 0]]);
+        }
+
+        // Shown full-width on the scanner page rather than as the generic status flash
+        return back()->with('scanned', $scan);
+    }
+
+    private function scanError(Request $request, string $message): RedirectResponse|JsonResponse
+    {
+        return $request->wantsJson()
+            ? response()->json(['message' => $message], 422)
+            : back()->withErrors(['rfid_uid' => $message]);
     }
 
     // Student Methods

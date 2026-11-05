@@ -7,20 +7,29 @@
     $counts = (clone $recorded)->get()->countBy('status');
     $scan = session('scanned');
     $late = ($scan['status'] ?? null) === 'late';
-    $startsLater = $event->start_time->isFuture();
 @endphp
 
 <x-page-header :title="$event->name" :back="route('events.show', $event)" back-label="Event details"
-    :description="($startsLater ? 'Starts ' . $event->start_time->format('g:i A') . '. Taps after that count as late. ' : 'Started ' . $event->start_time->format('g:i A') . ', taps now count as late. ')
-        . ($counts['present'] ?? 0) . ' present, ' . ($counts['late'] ?? 0) . ' late.'" />
+    :description="$event->start_time->isFuture()
+        ? 'Starts ' . $event->start_time->format('g:i A') . '. Taps after that count as late.'
+        : 'Started ' . $event->start_time->format('g:i A') . ', so taps now count as late. Ends ' . $event->endsAt() . '.'">
+    {{-- Browsers only allow sound after a click on the page, so the beep needs turning on once --}}
+    <button type="button" data-sound-toggle aria-pressed="false" class="btn btn-secondary">Turn on beep</button>
+</x-page-header>
 
+{{-- Taps are recorded by resources/js/app.js without reloading; this form is the no-JavaScript fallback --}}
 <form action="{{ route('attendance.logRfid', $event) }}" method="POST" id="rfid-form">
     @csrf
     <input type="hidden" name="rfid_uid" data-nfc data-nfc-submit>
 </form>
 
+<p class="mb-4 text-lg">
+    <strong data-count="present">{{ $counts['present'] ?? 0 }}</strong> present,
+    <strong data-count="late">{{ $counts['late'] ?? 0 }}</strong> late
+</p>
+
 {{-- Scan result: sized to be read from across the table --}}
-<div aria-live="assertive">
+<div data-scan-area aria-live="assertive">
     @if($scan)
         <div data-scan-result @class(['rounded-2xl px-6 py-10 text-white sm:px-10 sm:py-14', 'bg-wait' => $late, 'bg-seal' => !$late])>
             <p class="text-lg font-semibold text-white/80">{{ $scan['repeat'] ? 'Already recorded' : ($late ? 'Late' : 'Present') }}</p>
@@ -42,34 +51,31 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z" />
             </svg>
         </span>
-        <p class="mt-5 text-2xl font-bold">Ready. Tap a student ID on the reader.</p>
+        <p class="mt-5 text-2xl font-bold">Ready. Students can tap one after another.</p>
         <p id="nfc-status" class="reader-status mt-2">Connecting to the card reader…</p>
     </div>
 </div>
 
 <section class="mt-10" aria-labelledby="recent-heading">
     <h2 id="recent-heading" class="panel-title mb-4">Recently recorded</h2>
-    @if($recent->isEmpty())
-        <p class="text-ink-soft">No one yet.</p>
-    @else
-        <ul class="panel divide-y divide-rule">
-            @foreach($recent as $attendance)
-                <li class="flex items-center justify-between gap-4 px-5 py-3">
-                    <span class="font-semibold">{{ $attendance->user->name }}</span>
-                    <span class="flex items-center gap-3 text-sm text-ink-soft">
-                        @if($attendance->status === 'late') <x-badge tone="wait">Late</x-badge> @endif
-                        {{ $attendance->updated_at->format('g:i A') }}
-                    </span>
-                </li>
-            @endforeach
-        </ul>
-    @endif
+    <p data-recent-empty @class(['text-ink-soft', 'hidden' => $recent->isNotEmpty()])>No one yet.</p>
+    <ul data-recent @class(['panel divide-y divide-rule', 'hidden' => $recent->isEmpty()])>
+        @foreach($recent as $attendance)
+            <li class="flex items-center justify-between gap-4 px-5 py-3">
+                <span class="font-semibold">{{ $attendance->user->name }}</span>
+                <span class="flex items-center gap-3 text-sm text-ink-soft">
+                    @if($attendance->status === 'late') <x-badge tone="wait">Late</x-badge> @endif
+                    {{ $attendance->updated_at->format('g:i A') }}
+                </span>
+            </li>
+        @endforeach
+    </ul>
 </section>
 @endsection
 
 @push('scripts')
 <script>
-    // Return to the ready state after a few seconds so an old result isn't mistaken for the next student's
+    // Fallback page loads (no JavaScript scanning) show a result; return to ready after a few seconds
     setTimeout(() => {
         document.querySelectorAll('[data-scan-result]').forEach(el => el.remove());
         document.querySelector('[data-scan-idle]')?.classList.remove('hidden');
