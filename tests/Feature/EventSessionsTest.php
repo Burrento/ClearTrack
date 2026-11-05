@@ -177,43 +177,45 @@ class EventSessionsTest extends TestCase
         $event = $this->dayEvent();
         $morning = $this->sessionOf($event, 'morning');
 
-        $this->tapAt($event, '07:30');
-        $this->post(route('events.sessions.end', [$event, $morning]))->assertSessionHas('error'); // not started yet
+        $this->travelTo($this->day->copy()->setTime(6, 0));
+        $this->actingAs($this->officer)->post(route('events.sessions.end', [$event, $morning]))->assertSessionHas('error'); // not open yet
 
         $this->tapAt($event, '08:05');
         $this->travelTo($this->day->copy()->setTime(10, 0));
         $this->actingAs($this->officer)->post(route('events.sessions.end', [$event, $morning]))
-            ->assertRedirect(route('attendance.rfid', $event))
-            ->assertSessionHas('status', fn ($s) => str_contains($s, 'Time out is open until 10:30 AM'));
+            ->assertRedirect(route('events.show', $event))
+            ->assertSessionHas('status', 'Morning closed. No more taps are recorded for it.');
 
-        $this->assertSame('10:00', $morning->fresh()->ends_at->format('H:i'));
-        $this->assertSame('17:00', $event->fresh()->end_time->format('H:i')); // afternoon still to come
-        $this->tapAt($event, '10:05')->assertJson(['action' => 'out', 'session' => 'Morning']);
-        $this->tapAt($event, '10:35')->assertStatus(422); // morning over, afternoon not open until 12:00
+        $this->assertSame('10:00', $morning->fresh()->closed_at->format('H:i'));
+        $this->assertSame('12:00', $morning->fresh()->ends_at->format('H:i')); // scheduled times kept
+        $this->tapAt($event, '10:05')->assertStatus(422); // closed at once: no time-out window
+        $this->tapAt($event, '11:45')->assertStatus(422); // not even in its usual time-out window
+        $this->tapAt($event, '12:30')->assertJson(['action' => 'in', 'session' => 'Afternoon']); // afternoon unaffected
     }
 
     public function test_officer_ends_the_whole_event_early(): void
     {
         $event = $this->dayEvent();
-        $this->tapAt($event, '07:55');
+        $this->tapAt($event, '07:55'); // morning in, never out
 
         $this->travelTo($this->day->copy()->setTime(10, 0));
         $this->actingAs($this->officer)->post(route('events.end', $event))
-            ->assertSessionHas('status', fn ($s) => str_contains($s, 'Morning time out is open until 10:30 AM') && str_contains($s, 'Afternoon cancelled'));
+            ->assertSessionHas('status', 'Event ended. Morning closed; Afternoon cancelled. You can process absences now.');
 
         $event = $event->fresh();
         $this->assertSame(['morning'], $event->sessions->pluck('name')->all());
-        $this->assertSame('10:00', $event->end_time->format('H:i'));
+        $this->assertFalse($event->isOpenForAttendance());
+        $this->tapAt($event, '10:01')->assertStatus(422);
 
-        $this->tapAt($event, '10:10')->assertJson(['action' => 'out']);
-        $this->travelTo($this->day->copy()->setTime(10, 31));
+        // Processing works straight away, and the missing time out is fined
+        $this->travelTo($this->day->copy()->setTime(10, 1));
         $this->post(route('events.processFines', $event))->assertSessionHas('status');
-        $this->assertSame(0, \App\Models\Fine::count()); // tapped in and out of the only remaining session
+        $this->assertSame(['No time out (morning)'], \App\Models\Fine::pluck('reason')->all());
     }
 
-    public function test_ending_an_event_with_no_session_running_yet(): void
+    public function test_ending_an_event_with_a_session_started_early(): void
     {
-        // Morning started early at 6:00 and has a tap, but it's before 8:00 so nothing is "running"
+        // Morning started early at 6:00 and has a tap, before its 8:00 start
         $event = $this->dayEvent();
         $this->travelTo($this->day->copy()->setTime(6, 0));
         $this->actingAs($this->officer)->post(route('events.sessions.start', [$event, $this->sessionOf($event, 'morning')]));
@@ -221,10 +223,22 @@ class EventSessionsTest extends TestCase
 
         $this->post(route('events.end', $event))
             ->assertRedirect(route('events.show', $event))
-            ->assertSessionHas('status', 'Event ended early. Morning time out is open until 6:40 AM; Afternoon cancelled.');
+            ->assertSessionHas('status', 'Event ended. Morning closed; Afternoon cancelled. You can process absences now.');
 
         $this->assertSame(['morning'], $event->fresh()->sessions->pluck('name')->all());
-        $this->tapAt($event, '06:15')->assertJson(['action' => 'out', 'session' => 'Morning']);
+        $this->tapAt($event, '06:15')->assertStatus(422);
+    }
+
+    public function test_scheduled_processing_picks_up_an_event_ended_early(): void
+    {
+        $event = $this->dayEvent();
+        $this->tapAt($event, '07:55');
+        $this->travelTo($this->day->copy()->setTime(10, 0));
+        $this->actingAs($this->officer)->post(route('events.end', $event));
+
+        $this->travelTo($this->day->copy()->setTime(10, 5));
+        $this->artisan('cleartrack:process-fines')->assertSuccessful();
+        $this->assertTrue($event->fresh()->fines_processed);
     }
 
     public function test_ending_an_event_that_has_not_started_is_refused(): void

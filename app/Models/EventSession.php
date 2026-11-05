@@ -12,8 +12,9 @@ use Illuminate\Database\Eloquent\Model;
  * Time in:  from 1 hour before the start (or earlier, if an officer started attendance early) until
  *           30 min before the end; after the start it's late.
  * Time out: from 30 min before the end until 30 min after it.
+ * Ending early sets closed_at: both windows shut at once and no more taps are recorded.
  */
-#[Fillable(['event_id', 'name', 'starts_at', 'ends_at', 'in_opens_at'])]
+#[Fillable(['event_id', 'name', 'starts_at', 'ends_at', 'in_opens_at', 'closed_at'])]
 class EventSession extends Model
 {
     public const NAMES = ['morning', 'afternoon', 'evening'];
@@ -22,7 +23,7 @@ class EventSession extends Model
 
     protected function casts(): array
     {
-        return ['starts_at' => 'datetime', 'ends_at' => 'datetime', 'in_opens_at' => 'datetime'];
+        return ['starts_at' => 'datetime', 'ends_at' => 'datetime', 'in_opens_at' => 'datetime', 'closed_at' => 'datetime'];
     }
 
     public function event()
@@ -71,12 +72,20 @@ class EventSession extends Model
 
     public function isInOpen(): bool
     {
-        return now()->gte($this->inOpensAt()) && now()->lt($this->outOpensAt());
+        return !$this->closed_at && now()->gte($this->inOpensAt()) && now()->lt($this->outOpensAt());
     }
 
     public function isOutOpen(): bool
     {
-        return now()->between($this->outOpensAt(), $this->outClosesAt());
+        return !$this->closed_at && now()->between($this->outOpensAt(), $this->outClosesAt());
+    }
+
+    /**
+     * When no more taps can be recorded: when it was ended early, or when its time out closes.
+     */
+    public function closesAt(): CarbonInterface
+    {
+        return $this->closed_at?->copy() ?? $this->outClosesAt();
     }
 
     /**
@@ -84,24 +93,25 @@ class EventSession extends Model
      */
     public function canStartNow(): bool
     {
-        return $this->inOpensAt()->isFuture();
+        return !$this->closed_at && $this->inOpensAt()->isFuture();
     }
 
     /**
-     * Running (time in open, past its start), so an officer can end it now: its end becomes now,
-     * which closes time in and opens time out for OUT_WINDOW_MINUTES.
+     * Taps are being recorded, so an officer can end it now: it closes at once, with no time-out
+     * window. Students who haven't tapped out get the "no time out" fine when absences are processed.
      */
     public function canEndNow(): bool
     {
-        return $this->isInOpen() && $this->starts_at->isPast();
+        return $this->isInOpen() || $this->isOutOpen();
     }
 
     /**
-     * upcoming, in (time in open), out (time out open) or ended
+     * upcoming, in (time in open), out (time out open), closed (ended early) or ended
      */
     public function state(): string
     {
         return match (true) {
+            (bool) $this->closed_at => 'closed',
             $this->isOutOpen() => 'out',
             $this->isInOpen() => 'in',
             $this->canStartNow() => 'upcoming',

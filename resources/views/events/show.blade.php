@@ -23,7 +23,7 @@
 {{-- Actions, in the order an officer uses them --}}
 @php
     $open = !$event->fines_processed;
-    $endable = $open && $event->sessions->contains(fn ($s) => $s->canEndNow() || $s->starts_at->isFuture());
+    $endable = $open && $event->sessions->contains(fn ($s) => $s->canEndNow() || $s->canStartNow());
 @endphp
 <section class="panel panel-body mb-6" aria-label="Event actions">
     <div class="flex flex-wrap gap-3">
@@ -41,7 +41,7 @@
             <div class="flex flex-wrap gap-3 sm:ml-auto">
                 @if($endable)
                     <form action="{{ route('events.end', $event) }}" method="POST"
-                        onsubmit="return confirm('End the whole event now? Running sessions close time in and open time out for 30 minutes. Sessions that have not started yet are cancelled.')">
+                        onsubmit="return confirm('End the whole event now? Every session closes at once and no more taps are recorded. Sessions not started yet are cancelled. You can then process absences straight away.')">
                         @csrf
                         <button type="submit" class="btn btn-secondary btn-lg">End event now</button>
                     </form>
@@ -78,6 +78,7 @@
                             @case('upcoming') Time in opens {{ $session->inOpensAt()->format($session->inOpensAt()->isToday() ? 'g:i A' : 'M j, g:i A') }} @break
                             @case('in') <span class="font-semibold text-seal-deep">Time in open</span>{{ $session->starts_at->isFuture() ? ', late after ' . $session->starts_at->format('g:i A') : ', taps now are late' }} @break
                             @case('out') <span class="font-semibold text-seal-deep">Time out open</span> until {{ $session->outClosesAt()->format('g:i A') }} @break
+                            @case('closed') Ended early at {{ $session->closed_at->format('g:i A') }} @break
                             @default Ended
                         @endswitch
                     </p>
@@ -93,7 +94,7 @@
                         @endif
                         @if($session->canEndNow())
                             <form action="{{ route('events.sessions.end', [$event, $session]) }}" method="POST"
-                                onsubmit="return confirm(@js('End ' . strtolower($session->label()) . ' now? Time in closes, and time out opens for the next 30 minutes.'))">
+                                onsubmit="return confirm(@js('End ' . strtolower($session->label()) . ' now? It closes at once and no more taps are recorded for it. Students who have not tapped out will get the No time out fine.'))">
                                 @csrf
                                 <button type="submit" class="btn btn-secondary btn-sm">End now</button>
                             </form>

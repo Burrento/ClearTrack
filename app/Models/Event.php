@@ -74,11 +74,12 @@ class Event extends Model
     }
 
     /**
-     * When the last session's time out closes; absences can be processed after this.
+     * When the last session stops taking taps (its time out closes, or it was ended early);
+     * absences can be processed after this.
      */
     public function closesAt()
     {
-        return $this->end_time->copy()->addMinutes(EventSession::OUT_WINDOW_MINUTES);
+        return $this->sessions->map->closesAt()->max();
     }
 
     /**

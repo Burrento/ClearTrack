@@ -118,59 +118,53 @@ class EventController extends Controller
     }
 
     /**
-     * Ends a running session now: time in closes and time out opens for the next 30 minutes.
+     * Closes a session now: no more taps are recorded for it and there is no time-out window.
+     * Students who haven't tapped out get the "no time out" fine when absences are processed.
      */
     public function endSession(Event $event, EventSession $session): RedirectResponse
     {
         $this->authorizeSession($event, $session);
 
         if (!$session->canEndNow()) {
-            return back()->with('error', "{$session->label()} can only be ended while it's running (after its start, before time out).");
+            return back()->with('error', "{$session->label()} isn't taking taps right now, so there is nothing to end.");
         }
 
-        $session->update(['ends_at' => now()]);
-        $this->syncTimes($event);
+        $session->update(['closed_at' => now()]);
 
-        return redirect()->route('attendance.rfid', $event)->with('status',
-            "{$session->label()} ended early. Time out is open until {$session->outClosesAt()->format('g:i A')}.");
+        return redirect()->route('events.show', $event)->with('status', "{$session->label()} closed. No more taps are recorded for it.");
     }
 
     /**
-     * Ends the whole event now: running sessions end (time out opens for 30 minutes), sessions
-     * that haven't started are cancelled, and sessions already in time out or over are left alone.
+     * Ends the whole event now: sessions taking taps close at once, sessions not opened yet are
+     * cancelled, and absences can be processed straight away.
      */
     public function endEvent(Event $event): RedirectResponse
     {
         $this->authorizeDepartment($event->department_id);
 
-        $running = $event->sessions->filter->canEndNow();
-        $notStarted = $event->sessions->filter(fn ($s) => $s->starts_at->isFuture());
+        $open = $event->sessions->filter->canEndNow();
+        $notOpened = $event->sessions->filter->canStartNow(); // never opened, so no taps to lose
 
-        if ($event->fines_processed || ($running->isEmpty() && $notStarted->isEmpty())) {
+        if ($event->fines_processed || ($open->isEmpty() && $notOpened->isEmpty())) {
             return back()->with('error', 'There is nothing left to end in this event.');
         }
-        $cancelled = $notStarted->reject(fn ($s) => $s->attendances()->exists());
-        if ($cancelled->count() === $event->sessions->count()) {
+        if ($notOpened->count() === $event->sessions->count()) {
             return back()->with('error', "This event hasn't started yet, so there is nothing to end. Delete it from the Events list instead.");
         }
 
-        DB::transaction(function () use ($event, $running, $notStarted) {
-            $running->each->update(['ends_at' => now()]);
-            foreach ($notStarted as $session) {
-                // Someone already tapped into a session started early: end it rather than lose their taps
-                $session->attendances()->exists()
-                    ? $session->update(['starts_at' => now(), 'ends_at' => now()])
-                    : $session->delete();
-            }
+        DB::transaction(function () use ($event, $open, $notOpened) {
+            $open->each->update(['closed_at' => now()]);
+            $notOpened->each->delete();
             $this->syncTimes($event);
         });
 
-        // toBase(): these hold strings, which an Eloquent collection can't merge
-        $parts = $running->merge($notStarted->diff($cancelled))->toBase()
-            ->map(fn ($s) => "{$s->label()} time out is open until {$s->outClosesAt()->format('g:i A')}")
-            ->merge($cancelled->isEmpty() ? [] : [$cancelled->map->label()->implode(' and ') . ' cancelled']);
+        $parts = collect([
+            $open->isEmpty() ? null : $open->map->label()->implode(' and ') . ' closed',
+            $notOpened->isEmpty() ? null : $notOpened->map->label()->implode(' and ') . ' cancelled',
+        ])->filter();
 
-        return redirect()->route('events.show', $event)->with('status', 'Event ended early. ' . $parts->implode('; ') . '.');
+        return redirect()->route('events.show', $event)
+            ->with('status', 'Event ended. ' . $parts->implode('; ') . '. You can process absences now.');
     }
 
     private function authorizeSession(Event $event, EventSession $session): void
@@ -181,8 +175,7 @@ class EventController extends Controller
     }
 
     /**
-     * Keeps the event's start/end spanning its sessions; Event::closesAt() and the scheduled
-     * absence processing read end_time.
+     * Keeps the event's start/end spanning its sessions after one is cancelled.
      */
     private function syncTimes(Event $event): void
     {
