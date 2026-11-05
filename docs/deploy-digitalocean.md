@@ -1,232 +1,206 @@
 # Deploying ClearTrack to DigitalOcean
 
-One small server runs everything: the app, MySQL and the scheduler. The card reader bridge always runs on the officer's laptop, not on the server.
+This is how the live pilot server was set up. One small server runs everything: Nginx, PHP 8.3, MySQL and the scheduler. The card reader bridge always runs on the officer's laptop, not on the server.
 
-Values in `<angle brackets>` are yours to fill in. Example: `<domain>` = `cleartrack.example.com`.
+Live pilot: `https://178.128.57.54.sslip.io` (Droplet IP `178.128.57.54`). For a new server, replace the IP everywhere below. `<ip>.sslip.io` resolves to that IP automatically, so no domain is needed. To move to a real domain later, change `server_name` in Nginx, rerun certbot with the new name, update `APP_URL`, and run `php artisan config:cache`.
 
-## 1. Before you start
+## 1. Droplet
 
-1. **GitHub Student Developer Pack** (education.github.com/pack): verify with your school email or student ID, then claim the DigitalOcean credit from the pack's offers page.
-2. **Domain name.** The pack has included a free domain (Namecheap `.me` or `.TECH`). No domain? You can use `<server-ip>.sslip.io` instead (e.g. `159.89.1.2.sslip.io`). It points to your server automatically and still gets HTTPS.
-3. **Push the code to GitHub.** The server pulls from `https://github.com/Burrento/ClearTrack`. If the repo is private, you'll need a deploy key (step 4).
-
-## 2. Create the server (Droplet)
-
-DigitalOcean → **Create → Droplets**:
+DigitalOcean → Create → Droplets:
 
 | Setting | Choose |
 |---|---|
-| Region | **Singapore** (closest to the Philippines) |
-| Image | **Ubuntu 24.04 LTS** |
-| Size | Basic → Regular → **1 GB RAM / 1 CPU** ($6/mo) |
-| Authentication | **SSH key** (safer than a password) |
-| Extras | Tick **Monitoring**. Leave paid Backups off; step 9 covers backups for free. |
+| Region | Singapore (sgp1) |
+| Image | Ubuntu 24.04 LTS |
+| Size | Basic → Regular → **1 GB / 1 CPU** ($6/mo). 512 MB is too small. |
+| Authentication | SSH key (`ssh-keygen -t ed25519` on your laptop, paste the `.pub` line) |
+| Extras | Monitoring on, paid Backups off (step 7 covers backups) |
 
-Note the server's IP address.
+Set Billing → Billing Alerts. Billing is hourly; a powered-off Droplet still bills, so **destroy** it if the pilot stops.
 
-**Cost:** billing is hourly, so $5 credit runs the 1 GB server for about 3½ weeks. Create it about 2 weeks before the event. Afterwards, **destroy** it if it isn't continuing; a powered-off Droplet still bills. Set Billing → **Billing Alerts** at $5.
-
-**Firewall** (Networking → Firewalls → create, apply to the Droplet). Allow inbound:
-- 22 (SSH)
-- 80 and 443 (website)
-- 8443 (CloudPanel admin): set its source to **your own IP only**
-
-**Domain:** at your domain registrar, add an `A` record pointing `<domain>` to the server IP. Skip this if you use sslip.io.
-
-## 3. Install CloudPanel
-
-CloudPanel is a free control panel. It sets up Nginx, PHP, MySQL and HTTPS for you.
-
-1. Connect from your computer:
-   ```bash
-   ssh root@<server-ip>
-   ```
-2. Add 2 GB of swap, so 1 GB of RAM doesn't run out:
-   ```bash
-   fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
-   ```
-3. Copy the install command from **cloudpanel.io/docs → Getting Started → DigitalOcean**. Choose **Ubuntu 24.04** and **MySQL 8**, run it, and wait about 5 minutes.
-4. Open `https://<server-ip>:8443`. Click past the certificate warning and create the CloudPanel admin user.
-
-## 4. Create the site and database
-
-In CloudPanel:
-
-1. **Add Site → Create a PHP Site**
-   - Application: **Laravel**
-   - Domain: `<domain>`
-   - PHP version: **8.4**
-   - Site user: e.g. `cleartrack`
-   - Note the site user password.
-2. **Site → SSL/TLS → Actions → New Let's Encrypt Certificate.** This gives the site HTTPS.
-3. **Databases → Add Database:** name `cleartrack`, plus a user and password. Note them.
-
-Connect as the site user. You'll do everything from here on as this user, not root:
+Log in from your laptop:
 
 ```bash
-ssh cleartrack@<server-ip>
+ssh root@178.128.57.54
 ```
 
-**Private repo only:** create a deploy key and add it in GitHub → repo → Settings → Deploy keys (read-only):
+Everything below runs on the server as root unless it says otherwise.
+
+## 2. Base packages
+
+Add swap, so 1 GB of RAM doesn't run out:
 
 ```bash
-ssh-keygen -t ed25519 -C cleartrack-server
+fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
+
+Update the system. Press Enter on any config prompt:
 
 ```bash
-cat ~/.ssh/id_ed25519.pub
+apt update && apt upgrade -y
 ```
 
-Then use `git@github.com:Burrento/ClearTrack.git` in the clone step below.
-
-## 5. Get the code onto the server
+Install Nginx, MySQL, PHP 8.3 and Composer:
 
 ```bash
-cd ~/htdocs
+apt install -y nginx mysql-server php8.3-fpm php8.3-cli php8.3-mysql php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-bcmath php8.3-intl composer unzip git
 ```
+
+Turn on the firewall:
 
 ```bash
-rm -rf <domain> && git clone https://github.com/Burrento/ClearTrack.git <domain>
+ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw --force enable
 ```
+
+Install Node 22. Vite 8 needs Node 20.19+, and Ubuntu's own Node is older:
 
 ```bash
-cd <domain>
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt install -y nodejs
 ```
+
+## 3. Database and app user
+
+Create the database. The password is generated once and kept in `/root/db-password.txt`:
 
 ```bash
-composer install --no-dev --optimize-autoloader
+[ -f /root/db-password.txt ] || (openssl rand -hex 16 > /root/db-password.txt && chmod 600 /root/db-password.txt); DBPASS=$(cat /root/db-password.txt) && mysql -e "CREATE DATABASE IF NOT EXISTS cleartrack; CREATE USER IF NOT EXISTS 'cleartrack'@'localhost' IDENTIFIED BY '$DBPASS'; ALTER USER 'cleartrack'@'localhost' IDENTIFIED BY '$DBPASS'; GRANT ALL PRIVILEGES ON cleartrack.* TO 'cleartrack'@'localhost';" && echo DB_OK
 ```
 
-**Build the CSS/JS.** Node isn't installed for the site user, so install it once with nvm:
+The app runs as user `cleartrack`. PHP-FPM is switched to that user, so the web app, cron and Composer all use the same file owner:
 
 ```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+id cleartrack >/dev/null 2>&1 || adduser --disabled-password --gecos "" cleartrack; mkdir -p /var/www/cleartrack && chown cleartrack:cleartrack /var/www/cleartrack && sed -i 's/^user = www-data/user = cleartrack/; s/^group = www-data/group = cleartrack/' /etc/php/8.3/fpm/pool.d/www.conf && systemctl restart php8.3-fpm
 ```
+
+## 4. Code and `.env`
+
+Download the code and build it:
 
 ```bash
-source ~/.bashrc && nvm install --lts
+cd /var/www/cleartrack && sudo -u cleartrack -H git clone https://github.com/Burrento/ClearTrack.git . && sudo -u cleartrack -H composer install --no-dev --optimize-autoloader && sudo -u cleartrack -H npm ci && sudo -u cleartrack -H npm run build
 ```
+
+Create `.env` from the template and fill in production values:
 
 ```bash
-npm ci && npm run build
+cd /var/www/cleartrack && cp .env.example .env && sed -i \
+ -e 's|^APP_NAME=.*|APP_NAME=ClearTrack|' \
+ -e 's|^APP_ENV=.*|APP_ENV=production|' \
+ -e 's|^APP_DEBUG=.*|APP_DEBUG=false|' \
+ -e 's|^APP_URL=.*|APP_URL=https://178.128.57.54.sslip.io|' \
+ -e 's|^LOG_LEVEL=.*|LOG_LEVEL=warning|' \
+ -e 's|^DB_CONNECTION=.*|DB_CONNECTION=mysql|' \
+ -e 's|^# DB_HOST=.*|DB_HOST=127.0.0.1|' \
+ -e 's|^# DB_PORT=.*|DB_PORT=3306|' \
+ -e 's|^# DB_DATABASE=.*|DB_DATABASE=cleartrack|' \
+ -e 's|^# DB_USERNAME=.*|DB_USERNAME=cleartrack|' \
+ -e "s|^# DB_PASSWORD=.*|DB_PASSWORD=$(cat /root/db-password.txt)|" .env && chown cleartrack:cleartrack .env && chmod 640 .env
 ```
 
-## 6. Configure `.env`
+Set up the app key, tables and demo data, then cache the config:
 
 ```bash
-cp .env.example .env && nano .env
+cd /var/www/cleartrack && sudo -u cleartrack -H php artisan key:generate --force && sudo -u cleartrack -H php artisan migrate --force && sudo -u cleartrack -H php artisan db:seed --force && sudo -u cleartrack -H php artisan config:cache && sudo -u cleartrack -H php artisan route:cache && sudo -u cleartrack -H php artisan view:cache
 ```
 
-Change these lines and leave the rest:
+`APP_DEBUG=false` matters: with it on, error pages expose secrets.
 
-```ini
-APP_NAME=ClearTrack
-APP_ENV=production
-APP_DEBUG=false
-APP_URL=https://<domain>
+## 5. Nginx and HTTPS
 
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=cleartrack
-DB_USERNAME=<db-user>
-DB_PASSWORD=<db-password>
-```
-
-`APP_DEBUG=false` matters: with it on, error pages show your database password to anyone.
-
-Then set up the database:
+Write the site config:
 
 ```bash
-php artisan key:generate
+cat > /etc/nginx/sites-available/cleartrack <<'EOF'
+server {
+    listen 80;
+    server_name 178.128.57.54.sslip.io;
+    root /var/www/cleartrack/public;
+    index index.php;
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/cleartrack /etc/nginx/sites-enabled/cleartrack && rm -f /etc/nginx/sites-enabled/default && nginx -t && systemctl reload nginx
 ```
 
+Get the HTTPS certificate. Use a real email address; Let's Encrypt uses it to warn before expiry:
+
 ```bash
-php artisan migrate --force
+apt install -y certbot python3-certbot-nginx && certbot --nginx -d 178.128.57.54.sslip.io -m <your-email> --agree-tos --no-eff-email --redirect
 ```
 
+Certbot installs a timer that renews the certificate automatically.
+
+Run the Nginx step before certbot. If certbot runs first, it attaches the certificate to Nginx's default page. Fix that by doing this step, then rerunning certbot and choosing "reinstall".
+
+## 6. Lock the demo accounts
+
+The seeded passwords are public in this repo, so lock them immediately:
+
 ```bash
-php artisan db:seed --force
+cd /var/www/cleartrack && sudo -u cleartrack -H php artisan tinker --execute="App\Models\User::whereIn('username', ['SIT_Officer', 'LGC25-105680'])->update(['is_active' => false]);"
 ```
 
+Then log in as `superadmin` / `password` and change the password under **Account** right away.
+
+## 7. Scheduler and nightly backups
+
+Absence processing needs `schedule:run` every minute. There are no queued jobs, so no queue worker is needed:
+
 ```bash
-php artisan config:cache && php artisan route:cache && php artisan view:cache
+(crontab -u cleartrack -l 2>/dev/null | grep -v schedule:run; echo "* * * * * cd /var/www/cleartrack && php artisan schedule:run >> /dev/null 2>&1") | crontab -u cleartrack -
 ```
 
-Open `https://<domain>`. The login page should appear.
-
-## 7. Lock down the demo accounts
-
-The seeder creates demo logins with known passwords, so fix them right away:
-
-1. Log in as `superadmin` / `password`, then go to **Account → change password**.
-2. Deactivate the demo officer and the demo student:
-   ```bash
-   php artisan tinker --execute="App\Models\User::whereIn('username', ['SIT_Officer', 'LGC25-105680'])->update(['is_active' => false]);"
-   ```
-3. As admin, add the real department and its officers, and start the semester. Officers then register their students.
-
-## 8. Scheduler (automatic absence processing)
-
-CloudPanel → **Site → Cron Jobs → Add Cron Job**:
-
-- Schedule: every minute (`* * * * *`)
-- Command:
-  ```bash
-  /usr/bin/php8.4 /home/cleartrack/htdocs/<domain>/artisan schedule:run >> /dev/null 2>&1
-  ```
-
-The app has no queued jobs, so you don't need a queue worker.
-
-## 9. Nightly database backup
-
-Losing attendance and fine records is the one thing that can't be undone.
-
-As the site user, store the database login once:
+Nightly database dump at 2 AM, keeping the last 14:
 
 ```bash
-printf "[client]\nuser=<db-user>\npassword=<db-password>\n" > ~/.my.cnf && chmod 600 ~/.my.cnf && mkdir -p ~/backups
+printf "[client]\nuser=cleartrack\npassword=%s\n" "$(cat /root/db-password.txt)" > /home/cleartrack/.my.cnf && chown cleartrack:cleartrack /home/cleartrack/.my.cnf && chmod 600 /home/cleartrack/.my.cnf && sudo -u cleartrack mkdir -p /home/cleartrack/backups && (crontab -u cleartrack -l | grep -v mysqldump; echo '0 2 * * * mysqldump --no-tablespaces cleartrack | gzip > /home/cleartrack/backups/cleartrack-$(date +\%F).sql.gz && ls -t /home/cleartrack/backups/*.gz | tail -n +15 | xargs -r rm') | crontab -u cleartrack -
 ```
 
-Then add a second CloudPanel cron job, daily at 2 AM (`0 2 * * *`). It keeps the last 14 backups:
+Copy backups to your laptop now and then. A backup that only lives on the server is lost with the server:
 
 ```bash
-mysqldump --no-tablespaces cleartrack | gzip > ~/backups/cleartrack-$(date +\%F).sql.gz && ls -t ~/backups/*.gz | tail -n +15 | xargs -r rm
+scp "root@178.128.57.54:/home/cleartrack/backups/*.gz" .
 ```
 
-Every week or so, download a copy to your own computer (any SFTP app works: WinSCP, FileZilla). A backup only on the server is lost with the server.
-
-## 10. Card reader on the officer's laptop
-
-On each scanning laptop (Python and `pip install pyscard` once):
+## 8. Card reader (officer's laptop)
 
 ```bash
-python tools/acr122u_bridge.py https://<domain>
+python tools/acr122u_bridge.py https://178.128.57.54.sslip.io
 ```
 
-The address must match the browser's address bar exactly: `https`, no trailing slash, no `www` unless you use it.
+The address must match the browser's address bar exactly: `https`, no trailing slash. Allow the browser's "local network" or "localhost" prompt. Brave may block localhost silently; allow it in Shields, or use Chrome.
 
-The first time, Chrome may ask to let the site reach **devices on your local network**. Click **Allow**. The scanner page should then show a green **Card reader connected**.
+## 9. Updating the live site
 
-## 11. Updating the site later
-
-After pushing changes to GitHub:
+Push to `main` on GitHub, then on the server:
 
 ```bash
-cd ~/htdocs/<domain> && git pull && composer install --no-dev --optimize-autoloader && npm ci && npm run build && php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache
+cd /var/www/cleartrack && sudo -u cleartrack -H git pull && sudo -u cleartrack -H composer install --no-dev --optimize-autoloader && sudo -u cleartrack -H npm ci && sudo -u cleartrack -H npm run build && sudo -u cleartrack -H php artisan migrate --force && sudo -u cleartrack -H php artisan config:cache && sudo -u cleartrack -H php artisan route:cache && sudo -u cleartrack -H php artisan view:cache
 ```
 
 Don't update during an event.
 
-## 12. Dry run before Nurses Week
+## Troubleshooting
 
-Do this a few days ahead, on the real server, with real phones:
-
-- [ ] Admin: semester started, department and officers created
-- [ ] Officer: register 3–5 real students with real cards
-- [ ] Create a short test event that is live now
-- [ ] Open the scanner on the laptop and tap each card. A green name should appear.
-- [ ] Students log in on their phones over mobile data, not school Wi-Fi
-- [ ] Let the event end and wait 5 minutes. Untapped students should show **Absent** (this proves the scheduler works).
-- [ ] Next morning, check `~/backups` has a file (this proves backups work)
-- [ ] Delete or ignore the test event, and keep a paper sign-in sheet at each real event as a fallback
+| Symptom | Cause / fix |
+|---|---|
+| "Welcome to nginx!" | The default site is still enabled: rerun step 5's Nginx part |
+| "File not found." | Code missing in `/var/www/cleartrack`, or PHP-FPM not running as `cleartrack`: rerun steps 3–4 |
+| 500 error | `tail -20 /var/www/cleartrack/storage/logs/laravel.log` |
+| Page has no styles | `npm run build` didn't finish; rerun it as `cleartrack` |
+| Absences never processed | `crontab -u cleartrack -l` should list `schedule:run` |
