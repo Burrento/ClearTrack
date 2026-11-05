@@ -12,6 +12,7 @@ Run:    python tools/acr122u_bridge.py https://your-cleartrack-site
 import queue
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from smartcard.CardMonitoring import CardMonitor, CardObserver
@@ -30,17 +31,32 @@ def broadcast(uid):
             q.put(uid)
 
 
+def read_uid(card, attempts=5):
+    # Windows' smart card service briefly holds a newly tapped card ("reader not currently
+    # available", 0x80100017), so retry for ~0.6 s before giving up.
+    for attempt in range(attempts):
+        try:
+            conn = card.createConnection()
+            conn.connect()
+            try:
+                return conn.transmit(GET_UID)
+            finally:
+                conn.disconnect()
+        except Exception as e:
+            if "removed" in str(e) or attempt == attempts - 1:
+                raise
+            time.sleep(0.15)
+
+
 class UidReader(CardObserver):
     def update(self, observable, actions):
         added, _removed = actions
         for card in added:
             try:
-                conn = card.createConnection()
-                conn.connect()
-                data, sw1, sw2 = conn.transmit(GET_UID)
-                conn.disconnect()
+                data, sw1, sw2 = read_uid(card)
             except Exception as e:
-                print(f"Read failed: {e}")
+                reason = "card lifted too soon" if "removed" in str(e) else e
+                print(f"Read failed ({reason}). Tap again and hold the card still for a second.")
                 continue
             if (sw1, sw2) != (0x90, 0x00):
                 print(f"Card rejected GET UID (status {sw1:02X}{sw2:02X})")
