@@ -19,6 +19,7 @@
                 $link('Semesters', 'admin.semesters'),
                 $link('Departments', 'admin.departments'),
                 $link('Officers', 'admin.officers'),
+                $link('Backups', 'admin.backups', 'admin.backups*'),
             ]],
         ],
         default => [

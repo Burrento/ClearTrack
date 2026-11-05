@@ -15,6 +15,10 @@ mysqldump --no-tablespaces cleartrack | gzip > ~/backups/pre-deploy-$(date +%F-%
 ls -t ~/backups/pre-deploy-*.gz | tail -n +6 | xargs -r rm
 
 php artisan migrate --force
+
+# The admin's Backups page lists this folder (nightly, pre-deploy and its own backups)
+grep -q '^BACKUP_PATH=' .env || echo 'BACKUP_PATH=/home/cleartrack/backups' >> .env
+
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache

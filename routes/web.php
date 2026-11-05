@@ -9,6 +9,7 @@ use App\Http\Controllers\FineController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\ClearanceController;
+use App\Http\Controllers\BackupController;
 
 use Illuminate\Support\Facades\Auth;
 
@@ -73,6 +74,9 @@ Route::middleware('auth')->group(function () {
         Route::post('admin/officers', [AdminController::class, 'storeOfficer']);
         Route::get('admin/semesters', [AdminController::class, 'semesters'])->name('admin.semesters');
         Route::post('admin/semesters', [AdminController::class, 'startSemester']);
+        Route::get('admin/backups', [BackupController::class, 'index'])->name('admin.backups');
+        Route::post('admin/backups', [BackupController::class, 'store'])->name('admin.backups.store');
+        Route::get('admin/backups/{file}', [BackupController::class, 'download'])->name('admin.backups.download');
     });
 
     Route::middleware('role:student')->group(function () {
