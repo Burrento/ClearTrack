@@ -71,6 +71,9 @@ class ActivityLogTest extends TestCase
         $event = Event::create(['department_id' => $this->officer->department_id, 'name' => 'Now', 'start_time' => now()->subMinutes(10), 'end_time' => now()->addHours(2)]);
         $this->postJson(route('attendance.logRfid', $event), ['rfid_uid' => User::role('student')->first()->rfid_uid])->assertOk();
         $this->post(route('admin.backups.store'))->assertForbidden(); // officers can't
+        $fine = \App\Models\Fine::create(['user_id' => User::role('student')->first()->id, 'amount' => 50, 'status' => 'unpaid']);
+        $this->post(route('fines.markAsPaid', $fine));
+        $this->assertSame('paid', $fine->fresh()->status); // marking a fine paid isn't logged
 
         $this->assertSame(0, ActivityLog::count());
     }

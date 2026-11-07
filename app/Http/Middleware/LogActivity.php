@@ -15,8 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Records every action that changes something, in one place, so new actions are logged without
- * touching their controllers. Successful actions only, plus failed logins. Card taps aren't logged:
- * each one is already an attendance record with the officer who scanned it.
+ * touching their controllers. Successful actions only, plus failed logins. Not logged: card taps (each
+ * is already an attendance record with the officer who scanned it) and marking fines as paid.
  */
 class LogActivity
 {
@@ -38,7 +38,6 @@ class LogActivity
         'StudentController@import' => 'Imported students from CSV',
         'SurveyController@store' => 'Attached a survey',
         'SurveyController@submit' => 'Answered a survey',
-        'FineController@markAsPaid' => 'Recorded a payment',
         'AdminController@storeDepartment' => 'Added a department',
         'AdminController@updateDepartment' => 'Edited a department',
         'AdminController@toggleArchive' => 'Archived or restored a department',
@@ -48,7 +47,7 @@ class LogActivity
         'BackupController@download' => 'Downloaded a backup',
     ];
 
-    private const SKIP = ['AttendanceController@logRfid'];
+    private const SKIP = ['AttendanceController@logRfid', 'FineController@markAsPaid'];
 
     public function handle(Request $request, Closure $next): Response
     {
