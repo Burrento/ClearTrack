@@ -64,13 +64,13 @@ class StudentImportTest extends TestCase
         $csv = "name,student_id,year_level\n"
             . "\"Santos, Ana\",LGC26-6578,First Year\n"
             . "\"Reyes, Ben\",LGC26-20011,First Year\n"
-            . "\"Cruz, Cara\",LGC-5985,Second Year\n"
+            . "\"Cruz, Cara\",LGC25-5985,Second Year\n"
             . "\"Garcia, Dan\",LGC26-2-0014,Second Year\n"
             . "\"Lim, Eve\",LGC21-00026,Fourth Year\n";
 
         $this->upload($csv)->assertSessionHas('status', fn ($s) => str_starts_with($s, '5 students imported.'));
 
-        foreach (['LGC26-6578' => 'Santos6578', 'LGC26-20011' => 'Reyes20011', 'LGC-5985' => 'Cruz5985',
+        foreach (['LGC26-6578' => 'Santos6578', 'LGC26-20011' => 'Reyes20011', 'LGC25-5985' => 'Cruz5985',
             'LGC26-2-0014' => 'Garcia0014', 'LGC21-00026' => 'Lim00026'] as $id => $password) {
             $this->assertTrue(Hash::check($password, User::where('username', $id)->value('password')), "{$id} → {$password}");
         }

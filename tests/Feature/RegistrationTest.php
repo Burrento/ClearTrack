@@ -115,7 +115,7 @@ class RegistrationTest extends TestCase
         $this->artisan('db:seed', ['--class' => 'RolesAndPermissionsSeeder']);
         $officer = User::role('officer')->first();
 
-        foreach (['51410', 'LGC25105680', 'XYZ25-105680', 'LGC26-', 'LGC26--6578', 'LGC 26-6578', 'LGC26-65A8'] as $bad) {
+        foreach (['51410', 'LGC25105680', 'XYZ25-105680', 'LGC26-', 'LGC26--6578', 'LGC 26-6578', 'LGC26-65A8', 'LGC-5985', 'LGC6-5985', 'LGC266-5985'] as $bad) {
             $this->actingAs($officer)->post('/students', [
                 'name' => 'Bad ID',
                 'username' => $bad,

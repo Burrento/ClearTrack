@@ -135,7 +135,7 @@ class StudentController extends Controller
 
             $rowProblems = array_filter([
                 $name === '' ? 'name is empty' : null,
-                !preg_match(User::STUDENT_ID_PATTERN, $id) ? "student ID \"{$row['student_id']}\" should start with LGC and contain only numbers and dashes, e.g. LGC26-6578" : null,
+                !preg_match(User::STUDENT_ID_PATTERN, $id) ? "student ID \"{$row['student_id']}\" should be LGC, the 2-digit year, then numbers, e.g. LGC26-6578" : null,
                 isset($seenIds[$id]) ? "student ID {$id} is also on line {$seenIds[$id]}" : null,
                 !$year ? "year level \"{$row['year_level']}\" should be one of: " . implode(', ', self::YEAR_LEVELS) : null,
             ]);

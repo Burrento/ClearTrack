@@ -109,7 +109,7 @@
                     <div>
                         <label for="username" class="label">Student ID</label>
                         <input id="username" type="text" name="username" value="{{ old('username') }}" required
-                            placeholder="LGC26-6578" pattern="[Ll][Gg][Cc][0-9]*(-[0-9]+)+" title="LGC, then numbers and dashes, e.g. LGC26-6578"
+                            placeholder="LGC26-6578" pattern="[Ll][Gg][Cc][0-9]{2}(-[0-9]+)+" title="LGC, the 2-digit year, then numbers, e.g. LGC26-6578"
                             @class(['input', 'input-invalid' => $errors->has('username')])>
                         @error('username') <p class="field-error">{{ $message }}</p> @enderror
                     </div>

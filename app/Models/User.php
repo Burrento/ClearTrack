@@ -22,10 +22,10 @@ class User extends Authenticatable
     public const YEAR_LEVELS = ['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'];
 
     /**
-     * Student IDs as the school issues them: LGC, an optional year, then dash-separated numbers,
-     * e.g. LGC25-105680, LGC26-6578, LGC-5985, LGC26-2-0014.
+     * Student IDs as the school issues them: LGC, a 2-digit year, then dash-separated numbers,
+     * e.g. LGC25-105680, LGC26-6578, LGC26-2-0014.
      */
-    public const STUDENT_ID_PATTERN = '/^LGC\d*(-\d+)+$/';
+    public const STUDENT_ID_PATTERN = '/^LGC\d{2}(-\d+)+$/';
 
     /**
      * Get the department that the user belongs to.
