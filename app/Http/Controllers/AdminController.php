@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\Department;
 use App\Models\Semester;
 use App\Models\User;
@@ -89,6 +90,29 @@ class AdminController extends Controller
     }
 
     private const YEAR_LEVELS = User::YEAR_LEVELS;
+
+    /**
+     * Activity log: newest first, 50 a page, searchable by person, action or subject, filtered by role and day.
+     */
+    public function logs(Request $request): View
+    {
+        $filters = $request->validate([
+            'q' => 'nullable|string|max:100',
+            'role' => ['nullable', Rule::in(['admin', 'officer', 'student'])],
+            'date' => 'nullable|date',
+        ]);
+
+        $logs = ActivityLog::with('user.department')
+            ->when($filters['q'] ?? null, fn ($q, $term) => $q->where(fn ($q) => $q
+                ->where('action', 'like', "%{$term}%")->orWhere('subject', 'like', "%{$term}%")->orWhere('details', 'like', "%{$term}%")
+                ->orWhereHas('user', fn ($u) => $u->where('name', 'like', "%{$term}%")->orWhere('username', 'like', "%{$term}%"))))
+            ->when($filters['role'] ?? null, fn ($q, $role) => $q->whereHas('user', fn ($u) => $u->role($role)))
+            ->when($filters['date'] ?? null, fn ($q, $date) => $q->whereDate('created_at', $date))
+            ->latest('id')
+            ->paginate(50)->withQueryString();
+
+        return view('admin.logs', compact('logs', 'filters'));
+    }
 
     public function semesters(): View
     {

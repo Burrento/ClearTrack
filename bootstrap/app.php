@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Only localhost, so visitors can't spoof X-Forwarded-For to dodge the login throttle.
         $middleware->trustProxies(at: ['127.0.0.1', '::1']);
 
+        // After route-model binding, so log entries can name the student/event an action was about
+        $middleware->appendToGroup('web', \App\Http\Middleware\LogActivity::class);
+
         $middleware->alias([
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,

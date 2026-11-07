@@ -37,6 +37,8 @@ Seeded logins (`RolesAndPermissionsSeeder`): `superadmin` / `password` (admin), 
 
 **Backups**: admins have a Backups page (`BackupController`): "Back up now" runs `mysqldump` (path in `config/cleartrack.php`, `MYSQLDUMP_PATH`) into `BACKUP_PATH` as `manual-*.sql.gz` (newest 10 kept), and lists/downloads every `*.sql.gz` there. On the server `BACKUP_PATH` is `/home/cleartrack/backups` (added to `.env` by `deploy.sh`), where cron's nightly and `deploy.sh`'s pre-deploy dumps also land. Restoring is manual (see `docs/deploy-digitalocean.md`).
 
+**Activity log**: `App\Http\Middleware\LogActivity` (appended to the `web` group) writes an `ActivityLog` row for every successful state-changing request, plus failed logins and backup downloads: user, action label (`ACTIONS` map keyed by `Controller@method`, unmapped ones fall back to method + URL), subject (the route's model or the form's name/ID, read before the action runs), the `status` flash shown, and IP. Card taps (`logRfid`) are skipped since each is already an attendance row. Admins read it on the Logs page (`AdminController::logs`). New actions are logged automatically; add a label to `ACTIONS` for a readable name.
+
 **Surveys**: an event may `requires_survey`; `Survey` → `SurveyQuestion` → `SurveyResponse`, created by officers, answered by students.
 
 **Models** use PHP attributes (`#[Fillable]`, `#[Hidden]`) instead of `$fillable` properties — follow that style.

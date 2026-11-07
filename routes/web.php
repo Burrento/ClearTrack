@@ -74,6 +74,7 @@ Route::middleware('auth')->group(function () {
         Route::post('admin/officers', [AdminController::class, 'storeOfficer']);
         Route::get('admin/semesters', [AdminController::class, 'semesters'])->name('admin.semesters');
         Route::post('admin/semesters', [AdminController::class, 'startSemester']);
+        Route::get('admin/logs', [AdminController::class, 'logs'])->name('admin.logs');
         Route::get('admin/backups', [BackupController::class, 'index'])->name('admin.backups');
         Route::post('admin/backups', [BackupController::class, 'store'])->name('admin.backups.store');
         Route::get('admin/backups/{file}', [BackupController::class, 'download'])->name('admin.backups.download');
