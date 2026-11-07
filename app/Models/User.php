@@ -22,6 +22,12 @@ class User extends Authenticatable
     public const YEAR_LEVELS = ['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'];
 
     /**
+     * Student IDs as the school issues them: LGC, an optional year, then dash-separated numbers,
+     * e.g. LGC25-105680, LGC26-6578, LGC-5985, LGC26-2-0014.
+     */
+    public const STUDENT_ID_PATTERN = '/^LGC\d*(-\d+)+$/';
+
+    /**
      * Get the department that the user belongs to.
      */
     public function department()
@@ -62,15 +68,18 @@ class User extends Authenticatable
     }
 
     /**
-     * Default student password: last name with a capital first letter + last 6 digits of the ID,
-     * e.g. "Juan Santos" / LGC25-105680 → Santos105680. "Dela Cruz, Juan" → Delacruz105680.
+     * Default student password: last name with a capital first letter + the number after the ID's
+     * last dash, e.g. "Juan Santos" / LGC25-105680 → Santos105680, LGC26-6578 → Santos6578,
+     * LGC26-2-0014 → Santos0014. "Dela Cruz, Juan" → Delacruz105680.
      */
     public static function defaultPassword(string $name, string $studentId): string
     {
         // ponytail: "Lastname, Firstname" or last word; officer sees the result in the flash message
         $lastName = str_contains($name, ',') ? Str::before($name, ',') : Str::afterLast(trim($name), ' ');
 
-        return Str::ucfirst(Str::lower(preg_replace('/\s+/', '', $lastName))) . substr($studentId, -6);
+        $number = preg_match('/(\d+)$/', $studentId, $m) ? $m[1] : substr($studentId, -6);
+
+        return Str::ucfirst(Str::lower(preg_replace('/\s+/', '', $lastName))) . $number;
     }
 
     /**

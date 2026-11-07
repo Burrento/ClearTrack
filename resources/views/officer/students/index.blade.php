@@ -95,7 +95,7 @@
             @csrf
             <div class="p-6">
                 <h2 class="text-2xl font-bold">Register student</h2>
-                <p class="mt-1 text-ink-soft">Their password will be their last name and the last 6 digits of their ID.</p>
+                <p class="mt-1 text-ink-soft">Their password will be their last name and the number at the end of their ID.</p>
 
                 <div class="mt-6 space-y-5">
                     <div>
@@ -109,7 +109,7 @@
                     <div>
                         <label for="username" class="label">Student ID</label>
                         <input id="username" type="text" name="username" value="{{ old('username') }}" required
-                            placeholder="LGC25-105680" pattern="[Ll][Gg][Cc]\d{2}-\d{6}" title="Format: LGC25-105680"
+                            placeholder="LGC26-6578" pattern="[Ll][Gg][Cc][0-9]*(-[0-9]+)+" title="LGC, then numbers and dashes, e.g. LGC26-6578"
                             @class(['input', 'input-invalid' => $errors->has('username')])>
                         @error('username') <p class="field-error">{{ $message }}</p> @enderror
                     </div>
@@ -156,7 +156,7 @@
                     <li>Add one student per row:
                         <ul class="mt-1 list-disc space-y-0.5 pl-5 text-ink-soft">
                             <li><strong class="text-ink">name</strong>: e.g. <span class="code">Dela Cruz, Juan</span> (last name first with a comma for two-word last names)</li>
-                            <li><strong class="text-ink">student_id</strong>: e.g. <span class="code">LGC25-105680</span></li>
+                            <li><strong class="text-ink">student_id</strong>: e.g. <span class="code">LGC26-6578</span> or <span class="code">LGC25-105680</span></li>
                             <li><strong class="text-ink">year_level</strong>: First Year, Second Year, Third Year, Fourth Year or Fifth Year</li>
                         </ul>
                     </li>
@@ -178,7 +178,7 @@
                         </div>
                     @enderror
                 </div>
-                <p class="hint">Students already registered are skipped. Each new student's password is their last name plus the last 6 digits of their ID. Add RFID cards afterwards with Edit on each student.</p>
+                <p class="hint">Students already registered are skipped. Each new student's password is their last name plus the number at the end of their ID. Add RFID cards afterwards with Edit on each student.</p>
             </div>
 
             <div class="flex flex-col-reverse gap-3 border-t border-rule bg-paper/50 px-6 py-4 sm:flex-row sm:justify-end">

@@ -34,7 +34,7 @@ class StudentController extends Controller
 
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'username' => ['required', 'string', 'regex:/^LGC\d{2}-\d{6}$/', 'unique:users'],
+            'username' => ['required', 'string', 'regex:' . User::STUDENT_ID_PATTERN, 'unique:users'],
             'rfid_uid' => ['nullable', 'string', 'max:255', 'unique:users'],
             'year_level' => ['required', 'string', 'in:First Year,Second Year,Third Year,Fourth Year,Fifth Year'],
         ]);
@@ -135,7 +135,7 @@ class StudentController extends Controller
 
             $rowProblems = array_filter([
                 $name === '' ? 'name is empty' : null,
-                !preg_match('/^LGC\d{2}-\d{6}$/', $id) ? "student ID \"{$row['student_id']}\" isn't like LGC25-105680" : null,
+                !preg_match(User::STUDENT_ID_PATTERN, $id) ? "student ID \"{$row['student_id']}\" should start with LGC and contain only numbers and dashes, e.g. LGC26-6578" : null,
                 isset($seenIds[$id]) ? "student ID {$id} is also on line {$seenIds[$id]}" : null,
                 !$year ? "year level \"{$row['year_level']}\" should be one of: " . implode(', ', self::YEAR_LEVELS) : null,
             ]);
@@ -179,7 +179,7 @@ class StudentController extends Controller
 
         return redirect()->route('students.index')->with('status', count($rows) . ' ' . Str::plural('student', count($rows)) . ' imported.'
             . ($skipped ? " {$skipped} already registered, so skipped." : '')
-            . ' Each default password is their last name plus the last 6 digits of their ID.');
+            . ' Each default password is their last name plus the number at the end of their ID.');
     }
 
     private function normalizeRfid($rfid): ?string
