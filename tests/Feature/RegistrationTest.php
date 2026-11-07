@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class RegistrationTest extends TestCase
@@ -42,25 +43,47 @@ class RegistrationTest extends TestCase
         $other->assignRole('student');
 
         $this->actingAs($officer)->get(route('students.edit', $student))->assertOk()->assertSee('12:34:56:78:90');
+        $same = ['username' => $student->username, 'year_level' => 'First Year'];
 
-        $this->put(route('students.update', $student), ['name' => 'Renamed', 'rfid_uid' => '04:a1:b2:c3'])
+        $this->put(route('students.update', $student), ['name' => 'Renamed', 'rfid_uid' => '04:a1:b2:c3'] + $same)
             ->assertSessionHasNoErrors()->assertRedirect(route('students.index'));
         $this->assertSame('Renamed', $student->fresh()->name);
         $this->assertSame('04A1B2C3', $student->fresh()->rfid_uid);
 
         // Card already belongs to another student
-        $this->put(route('students.update', $student), ['name' => 'Renamed', 'rfid_uid' => 'AA:BB:CC:DD'])
+        $this->put(route('students.update', $student), ['name' => 'Renamed', 'rfid_uid' => 'AA:BB:CC:DD'] + $same)
             ->assertSessionHasErrors('rfid_uid');
 
         // Saving the student's own card again is fine; clearing removes it
-        $this->put(route('students.update', $student), ['name' => 'Renamed', 'rfid_uid' => '04:A1:B2:C3'])->assertSessionHasNoErrors();
-        $this->put(route('students.update', $student), ['name' => 'Renamed', 'rfid_uid' => ''])->assertSessionHasNoErrors();
+        $this->put(route('students.update', $student), ['name' => 'Renamed', 'rfid_uid' => '04:A1:B2:C3'] + $same)->assertSessionHasNoErrors();
+        $this->put(route('students.update', $student), ['name' => 'Renamed', 'rfid_uid' => ''] + $same)->assertSessionHasNoErrors();
         $this->assertNull($student->fresh()->rfid_uid);
 
         $soa = User::create(['name' => 'SOA', 'username' => 'LGC25-888888', 'password' => 'x', 'department_id' => Department::where('code', 'SOA')->value('id')]);
         $soa->assignRole('student');
         $this->get(route('students.edit', $soa))->assertForbidden();
         $this->put(route('students.update', $soa), ['name' => 'Hijack'])->assertForbidden();
+    }
+
+    public function test_officer_corrects_id_and_year_level_and_resets_password(): void
+    {
+        $this->artisan('db:seed', ['--class' => 'RolesAndPermissionsSeeder']);
+        $student = User::role('student')->first();
+        $student->update(['name' => 'Santos, Ana', 'username' => 'LGC26-6O70', 'year_level' => 'First Year']); // typo'd ID
+        $edit = fn ($fields) => $this->actingAs(User::role('officer')->first())->put(route('students.update', $student),
+            $fields + ['name' => 'Santos, Ana', 'username' => 'lgc26-6070', 'year_level' => 'Second Year']);
+
+        $edit([])->assertSessionHasNoErrors()->assertSessionHas('status', fn ($s) => !str_contains($s, 'Password reset'));
+        $this->assertSame('LGC26-6070', $student->fresh()->username);
+        $this->assertSame('Second Year', $student->fresh()->year_level);
+
+        $edit(['reset_password' => '1'])->assertSessionHas('status', fn ($s) => str_contains($s, 'Password reset to: Santos6070'));
+        $this->assertTrue(Hash::check('Santos6070', $student->fresh()->password));
+
+        $edit(['username' => 'LGC-6070'])->assertSessionHasErrors('username');
+        $edit(['year_level' => 'Sixth Year'])->assertSessionHasErrors('year_level');
+        $taken = User::create(['name' => 'Other', 'username' => 'LGC25-999999', 'password' => 'x', 'department_id' => $student->department_id]);
+        $edit(['username' => 'LGC25-999999'])->assertSessionHasErrors('username');
     }
 
     public function test_registration_screen_can_be_rendered(): void

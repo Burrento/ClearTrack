@@ -72,16 +72,25 @@ class StudentController extends Controller
         $this->authorizeDepartment($user->department_id);
         abort_unless($user->hasRole('student'), 404);
 
-        $request->merge(['rfid_uid' => $this->normalizeRfid($request->rfid_uid)]);
+        $request->merge([
+            'username' => strtoupper(trim((string) $request->username)),
+            'rfid_uid' => $this->normalizeRfid($request->rfid_uid),
+        ]);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'regex:' . User::STUDENT_ID_PATTERN, Rule::unique('users')->ignore($user->id)],
+            'year_level' => ['required', Rule::in(User::YEAR_LEVELS)],
             'rfid_uid' => ['nullable', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
         ]);
 
-        $user->update($validated);
+        // A corrected name or ID doesn't change the password on its own; the officer can reset it to the
+        // default for the corrected details (also how a student who forgot their password gets back in).
+        $password = $request->boolean('reset_password') ? User::defaultPassword($validated['name'], $validated['username']) : null;
+        $user->update($validated + ($password ? ['password' => Hash::make($password)] : []));
 
-        return redirect()->route('students.index')->with('status', "Changes saved for {$user->name}. RFID card: " . ($user->formattedRfid() ?? 'None'));
+        return redirect()->route('students.index')->with('status', "Changes saved for {$user->name}. RFID card: " . ($user->formattedRfid() ?? 'None')
+            . ($password ? ". Password reset to: {$password}" : ''));
     }
 
     /**

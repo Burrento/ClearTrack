@@ -13,9 +13,36 @@
                 <label for="name" class="label">Full name</label>
                 <input id="name" type="text" name="name" value="{{ old('name', $student->name) }}" required
                     @class(['input', 'input-invalid' => $errors->has('name')])>
-                <p class="hint">Changing the name doesn't change their password.</p>
                 @error('name') <p class="field-error">{{ $message }}</p> @enderror
             </div>
+
+            <div class="grid gap-6 sm:grid-cols-2">
+                <div>
+                    <label for="username" class="label">Student ID</label>
+                    <input id="username" type="text" name="username" value="{{ old('username', $student->username) }}" required
+                        pattern="[Ll][Gg][Cc][0-9]{2}(-[0-9]+)+" title="LGC, the 2-digit year, then numbers, e.g. LGC26-6578"
+                        @class(['input code', 'input-invalid' => $errors->has('username')])>
+                    @error('username') <p class="field-error">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <label for="year_level" class="label">Year level</label>
+                    <select id="year_level" name="year_level" required @class(['input', 'input-invalid' => $errors->has('year_level')])>
+                        @foreach(\App\Models\User::YEAR_LEVELS as $level)
+                            <option value="{{ $level }}" @selected(old('year_level', $student->year_level) === $level)>{{ $level }}</option>
+                        @endforeach
+                    </select>
+                    @error('year_level') <p class="field-error">{{ $message }}</p> @enderror
+                </div>
+            </div>
+            <p class="hint -mt-3">The Student ID is also their username for logging in.</p>
+
+            <label class="flex items-start gap-3">
+                <input type="checkbox" name="reset_password" value="1" class="checkbox mt-0.5" @checked(old('reset_password'))>
+                <span>
+                    <span class="block font-semibold">Reset password to the default</span>
+                    <span class="text-sm text-ink-soft">Their last name plus the number at the end of their ID. Use this after correcting their name or ID, or if they forgot their password. The new password is shown after saving.</span>
+                </span>
+            </label>
 
             <div>
                 <label for="rfid_uid" class="label">RFID card</label>
