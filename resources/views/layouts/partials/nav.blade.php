@@ -11,7 +11,10 @@
                 $link('Fines', 'fines.index', 'fines.*'),
                 $link('Clearance', 'clearance.index', 'clearance.*'),
             ]],
-            ['title' => 'Records', 'links' => [$link('Students', 'students.index', 'students.*')]],
+            ['title' => 'Records', 'links' => [
+                $link('Students', 'students.index', ['students.index', 'students.edit']),
+                $link('Who-is', 'students.whoIs'),
+            ]],
         ],
         auth()->user()->hasRole('admin') => [
             ['title' => null, 'links' => [

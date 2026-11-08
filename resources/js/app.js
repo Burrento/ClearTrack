@@ -15,6 +15,7 @@ if (nfcInput) {
             record(e.data);
         } else {
             nfcInput.value = e.data.match(/.{1,2}/g).join(':'); // 04:A1:B2..., server strips the colons
+            if (nfcInput.hasAttribute('data-nfc-autosubmit')) nfcInput.form.submit(); // Who-is: look it up
         }
     };
 }

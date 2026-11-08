@@ -56,6 +56,19 @@ class StudentController extends Controller
             . '. RFID card: ' . ($user->formattedRfid() ?? 'None'));
     }
 
+    /**
+     * "Who-is": whose RFID card is this? Read-only. Students of other departments are only
+     * reported as such, without their details.
+     */
+    public function whoIs(Request $request): View
+    {
+        $uid = $this->normalizeRfid($request->query('rfid'));
+        $student = $uid ? User::role('student')->where('rfid_uid', $uid)->first() : null;
+        $ownDepartment = $student && $student->department_id === auth()->user()->department_id;
+
+        return view('officer.students.who-is', compact('uid', 'student', 'ownDepartment'));
+    }
+
     public function edit(User $user): View
     {
         $this->authorizeDepartment($user->department_id);
