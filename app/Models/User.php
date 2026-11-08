@@ -83,6 +83,14 @@ class User extends Authenticatable
     }
 
     /**
+     * A card number as stored: hex digits only, upper case ("04:a1-b2" → "04A1B2"), or null if empty.
+     */
+    public static function normalizeRfid($rfid): ?string
+    {
+        return strtoupper(preg_replace('/[^0-9A-Fa-f]/', '', (string) $rfid)) ?: null;
+    }
+
+    /**
      * RFID serial key grouped for display, e.g. 04:A1:B2:C3. Stored without separators.
      */
     public function formattedRfid(): ?string

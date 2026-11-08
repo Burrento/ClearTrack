@@ -206,7 +206,7 @@ class StudentController extends Controller
 
     private function normalizeRfid($rfid): ?string
     {
-        return strtoupper(preg_replace('/[^0-9A-Fa-f]/', '', (string) $rfid)) ?: null;
+        return User::normalizeRfid($rfid);
     }
 
     /**
