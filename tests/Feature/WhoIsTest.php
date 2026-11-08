@@ -49,7 +49,7 @@ class WhoIsTest extends TestCase
 
     public function test_unknown_card_and_empty_page(): void
     {
-        $this->lookUp(null)->assertOk()->assertSee('Tap a card')->assertDontSee('No student has this card');
+        $this->lookUp(null)->assertOk()->assertSee('Tap a card on the reader')->assertDontSee('Look up')->assertDontSee('No student has this card');
         $this->lookUp('DE:AD:BE:EF')->assertSee('No student has this card')->assertSee('DE:AD:BE:EF');
     }
 

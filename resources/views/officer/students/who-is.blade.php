@@ -4,16 +4,15 @@
 @php $card = $uid ? implode(':', str_split($uid, 2)) : null; @endphp
 
 <div class="mx-auto max-w-lg">
-    <x-page-header title="Who-is" description="Tap a card to see whether it's registered, and to whom. Nothing is recorded." />
+    <x-page-header title="Who-is" description="Tap a card on the reader to see whether it's registered, and to whom. Nothing is recorded." />
 
     {{-- A tap fills the field and looks it up straight away (data-nfc-autosubmit in resources/js/app.js) --}}
     <form method="GET" action="{{ route('students.whoIs') }}" class="panel panel-body">
         <label for="rfid" class="label">RFID card</label>
-        <div class="flex gap-2">
-            <input id="rfid" type="text" name="rfid" value="{{ $card }}" data-nfc data-nfc-autosubmit autocomplete="off"
-                placeholder="Tap a card, or type its number" class="input code">
-            <button type="submit" class="btn btn-secondary">Look up</button>
-        </div>
+        {{-- Read-only: only a card tap fills it, so the result is always for a real card --}}
+        <input id="rfid" type="text" name="rfid" value="{{ $card }}" data-nfc data-nfc-autosubmit readonly autocomplete="off"
+            placeholder="Tap a card on the reader" class="input code cursor-not-allowed bg-paper">
+        <p class="hint">Each tap looks the card up straight away. Tap another card to check it too.</p>
         <p id="nfc-status" class="reader-status">Connecting to the card reader…</p>
     </form>
 
