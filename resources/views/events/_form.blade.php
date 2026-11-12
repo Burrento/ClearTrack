@@ -4,7 +4,24 @@
     $existing = $event?->sessions->keyBy('name');
 @endphp
 
-<div class="space-y-6">
+{{-- tick is bumped on every input so absent() re-reads the ticks and amounts --}}
+<div class="space-y-6" @input="tick++" @change="tick++" x-data="{
+    tick: 0,
+    absent() {
+        this.tick;
+        const peso = (id) => Math.max(0, parseFloat(document.getElementById(id)?.value) || 0);
+        const box = (name, part) => this.$root.querySelector(`[name='sessions[${name}][${part}]']`)?.checked;
+        const parts = @js(array_keys($defaults)).filter((name) => box(name, 'enabled')).map((name) => ({
+            name: name[0].toUpperCase() + name.slice(1),
+            amount: (box(name, 'has_in') ? peso('missed_in_fine') : 0) + (box(name, 'has_out') ? peso('missed_out_fine') : 0),
+        }));
+        const money = (n) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const total = parts.reduce((sum, p) => sum + p.amount, 0);
+        return parts.length > 1
+            ? `${money(total)} if absent from every session (${parts.map((p) => p.name + ' ' + money(p.amount)).join(' + ')})`
+            : `${money(total)} if absent from the session`;
+    },
+}">
     <div>
         <label for="name" class="label">Event name</label>
         <input type="text" name="name" id="name" value="{{ old('name', $event?->name) }}" required placeholder="Nurses Week, Day 1"
@@ -94,7 +111,8 @@
                 </div>
             @endforeach
         </div>
-        <p class="hint">Charged when absences are processed after the last session. A student with no taps at all is fined no time in + no time out. Late and no time out can both apply. Enter 0 for no fine.</p>
+        <p class="mt-3 font-semibold">Absent (no taps): <span x-text="absent()"></span></p>
+        <p class="hint">Absent is no time in + no time out for each session. Charged when absences are processed after the last session. Late and no time out can both apply. Enter 0 for no fine.</p>
     </fieldset>
 
     <label class="flex items-start gap-3">
