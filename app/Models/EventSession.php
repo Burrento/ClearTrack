@@ -13,8 +13,10 @@ use Illuminate\Database\Eloquent\Model;
  *           30 min before the end; after the start it's late.
  * Time out: from 30 min before the end until 30 min after it.
  * Ending early sets closed_at: both windows shut at once and no more taps are recorded.
+ * has_in / has_out turn a tap off: an in-only session takes time in until its end and closes then;
+ * an out-only session only has the time-out window.
  */
-#[Fillable(['event_id', 'name', 'starts_at', 'ends_at', 'in_opens_at', 'closed_at'])]
+#[Fillable(['event_id', 'name', 'starts_at', 'ends_at', 'has_in', 'has_out', 'in_opens_at', 'closed_at'])]
 class EventSession extends Model
 {
     public const NAMES = ['morning', 'afternoon', 'evening'];
@@ -23,7 +25,8 @@ class EventSession extends Model
 
     protected function casts(): array
     {
-        return ['starts_at' => 'datetime', 'ends_at' => 'datetime', 'in_opens_at' => 'datetime', 'closed_at' => 'datetime'];
+        return ['starts_at' => 'datetime', 'ends_at' => 'datetime', 'in_opens_at' => 'datetime', 'closed_at' => 'datetime',
+            'has_in' => 'boolean', 'has_out' => 'boolean'];
     }
 
     public function event()
@@ -70,14 +73,20 @@ class EventSession extends Model
         return $this->ends_at->copy()->addMinutes(self::OUT_WINDOW_MINUTES);
     }
 
+    /** Time in gives way to time out, or runs to the end when there's no time out. */
+    public function inClosesAt(): CarbonInterface
+    {
+        return $this->has_out ? $this->outOpensAt() : $this->ends_at->copy();
+    }
+
     public function isInOpen(): bool
     {
-        return !$this->closed_at && now()->gte($this->inOpensAt()) && now()->lt($this->outOpensAt());
+        return $this->has_in && !$this->closed_at && now()->gte($this->inOpensAt()) && now()->lt($this->inClosesAt());
     }
 
     public function isOutOpen(): bool
     {
-        return !$this->closed_at && now()->between($this->outOpensAt(), $this->outClosesAt());
+        return $this->has_out && !$this->closed_at && now()->between($this->outOpensAt(), $this->outClosesAt());
     }
 
     /**
@@ -85,7 +94,7 @@ class EventSession extends Model
      */
     public function closesAt(): CarbonInterface
     {
-        return $this->closed_at?->copy() ?? $this->outClosesAt();
+        return $this->closed_at?->copy() ?? ($this->has_out ? $this->outClosesAt() : $this->ends_at->copy());
     }
 
     /**
@@ -93,7 +102,7 @@ class EventSession extends Model
      */
     public function canStartNow(): bool
     {
-        return !$this->closed_at && $this->inOpensAt()->isFuture();
+        return $this->has_in && !$this->closed_at && $this->inOpensAt()->isFuture();
     }
 
     /**
@@ -114,9 +123,21 @@ class EventSession extends Model
             (bool) $this->closed_at => 'closed',
             $this->isOutOpen() => 'out',
             $this->isInOpen() => 'in',
-            $this->canStartNow() => 'upcoming',
+            $this->canStartNow() || (!$this->has_in && $this->outOpensAt()->isFuture()) => 'upcoming',
             default => 'ended',
         };
+    }
+
+    /** When the first tap opens: time in, or time out for an out-only session. */
+    public function opensAt(): CarbonInterface
+    {
+        return $this->has_in ? $this->inOpensAt() : $this->outOpensAt();
+    }
+
+    /** "time in and out", "time in only" or "time out only" */
+    public function taps(): string
+    {
+        return $this->has_in && $this->has_out ? 'time in and out' : ($this->has_in ? 'time in only' : 'time out only');
     }
 
     /**

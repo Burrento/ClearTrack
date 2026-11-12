@@ -19,7 +19,7 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, HasRoles;
 
-    public const YEAR_LEVELS = ['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'];
+    public const YEAR_LEVELS = ['First Year', 'Second Year', 'Third Year', 'Fourth Year'];
 
     /**
      * Student IDs as the school issues them: LGC, a 2-digit year, then dash-separated numbers,

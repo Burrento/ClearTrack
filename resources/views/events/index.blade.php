@@ -35,7 +35,7 @@
                     </td>
                     <td class="align-top whitespace-nowrap text-sm">
                         <dl class="grid grid-cols-[auto_auto] gap-x-3">
-                            @foreach(['Absent' => $event->absent_fine, 'Late' => $event->late_fine, 'No time in' => $event->missed_in_fine, 'No time out' => $event->missed_out_fine] as $label => $amount)
+                            @foreach(['No time in' => $event->missed_in_fine, 'No time out' => $event->missed_out_fine, 'Late' => $event->late_fine] as $label => $amount)
                                 <dt class="text-ink-soft">{{ $label }}</dt>
                                 <dd class="text-right font-semibold">₱{{ number_format($amount, 2) }}</dd>
                             @endforeach

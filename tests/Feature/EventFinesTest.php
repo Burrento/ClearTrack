@@ -10,7 +10,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Each event fines absent and late students its own amounts; paying every fine clears the student.
+ * Each event fines missed taps and late students its own amounts (absent = no time in + no time out);
+ * paying every fine clears the student.
  */
 class EventFinesTest extends TestCase
 {
@@ -43,9 +44,19 @@ class EventFinesTest extends TestCase
             'name' => 'Assembly',
             'start_time' => now()->subHours(2),
             'end_time' => now()->subHour(),
-            'absent_fine' => 50,
+            'missed_in_fine' => 50,
+            'missed_out_fine' => 50,
             'late_fine' => 20,
         ]);
+    }
+
+    /** An ended one-session event whose session takes only the given taps. */
+    private function endedSession(bool $hasIn, bool $hasOut): Event
+    {
+        $event = $this->endedEvent();
+        $event->sessions->first()->update(['has_in' => $hasIn, 'has_out' => $hasOut]);
+
+        return $event->fresh();
     }
 
     public function test_officer_sets_absent_and_late_fines_on_an_event(): void
@@ -53,20 +64,22 @@ class EventFinesTest extends TestCase
         $this->actingAs($this->officer)->post(route('events.store'), [
             'name' => 'General assembly',
             'date' => now()->addDay()->toDateString(),
-            'sessions' => ['morning' => ['enabled' => '1', 'start' => '08:00', 'end' => '10:00']],
-            'absent_fine' => '50',
+            'sessions' => ['morning' => ['enabled' => '1', 'start' => '08:00', 'end' => '10:00', 'has_in' => '1', 'has_out' => '1']],
             'late_fine' => '20.50',
-            'missed_in_fine' => '0',
-            'missed_out_fine' => '0',
+            'missed_in_fine' => '50',
+            'missed_out_fine' => '50',
         ])->assertSessionHasNoErrors()->assertRedirect(route('events.index'));
 
         $event = Event::sole();
-        $this->assertSame('50.00', $event->absent_fine);
+        $this->assertSame('50.00', $event->missed_in_fine);
         $this->assertSame('20.50', $event->late_fine);
 
-        $this->post(route('events.store'), ['name' => 'Bad', 'date' => now()->toDateString(), 'sessions' => ['morning' => ['enabled' => '1', 'start' => '08:00', 'end' => '10:00']],
-            'absent_fine' => -5, 'late_fine' => 0, 'missed_in_fine' => 0, 'missed_out_fine' => 0])
-            ->assertSessionHasErrors('absent_fine');
+        // The new-event form starts at ₱50 per missed tap and ₱20 late
+        $this->get(route('events.create'))->assertSee('value="50"', false)->assertSee('value="20"', false);
+
+        $this->post(route('events.store'), ['name' => 'Bad', 'date' => now()->toDateString(), 'sessions' => ['morning' => ['enabled' => '1', 'start' => '08:00', 'end' => '10:00', 'has_in' => '1', 'has_out' => '1']],
+            'late_fine' => 0, 'missed_in_fine' => -5, 'missed_out_fine' => 0])
+            ->assertSessionHasErrors('missed_in_fine');
     }
 
     public function test_processing_fines_absent_and_late_students_but_not_present_ones(): void
@@ -81,7 +94,7 @@ class EventFinesTest extends TestCase
         $this->actingAs($this->officer)->post(route('events.processFines', $event))
             ->assertSessionHas('status', fn ($s) => str_contains($s, '1 absent, 1 late'));
 
-        $this->assertEquals(50, Fine::where('user_id', $this->student->id)->sole()->amount);
+        $this->assertEquals(100, Fine::where('user_id', $this->student->id)->sole()->amount); // no time in + no time out
         $this->assertStringStartsWith('Absent (', Fine::where('user_id', $this->student->id)->sole()->reason);
         $this->assertEquals(20, Fine::where('user_id', $late->id)->sole()->amount);
         $this->assertSame(0, Fine::where('user_id', $present->id)->count());
@@ -94,7 +107,7 @@ class EventFinesTest extends TestCase
 
     public function test_zero_amount_means_no_fine(): void
     {
-        $this->endedEvent(['absent_fine' => 0])->markAbsentees();
+        $this->endedEvent(['missed_in_fine' => 0, 'missed_out_fine' => 0])->markAbsentees();
 
         $this->assertSame('absent', Attendance::where('user_id', $this->student->id)->value('status'));
         $this->assertSame(0, Fine::count());
@@ -106,12 +119,37 @@ class EventFinesTest extends TestCase
         $this->endedEvent(['name' => 'Seminar'])->markAbsentees();
 
         $this->assertFalse($this->student->isCleared());
-        $this->actingAs($this->officer)->get(route('clearance.index'))->assertSee('₱100.00')->assertSee('Not cleared');
+        $this->actingAs($this->officer)->get(route('clearance.index'))->assertSee('₱200.00')->assertSee('Not cleared');
 
         Fine::all()->each(fn ($fine) => $this->post(route('fines.markAsPaid', $fine)));
 
         $this->assertTrue($this->student->fresh()->isCleared());
         $this->get(route('clearance.index'))->assertSee('1 of 1 students cleared');
+    }
+
+    public function test_in_only_session_fines_only_a_missed_time_in(): void
+    {
+        $event = $this->endedSession(true, false);
+        $tapped = $this->student('LGC25-200003');
+        Attendance::create(['event_id' => $event->id, 'event_session_id' => $event->sessions->first()->id, 'user_id' => $tapped->id, 'status' => 'present', 'time_in_at' => now()]);
+
+        $event->markAbsentees();
+
+        $this->assertSame(0, Fine::where('user_id', $tapped->id)->count()); // no time out needed
+        $this->assertEquals(50, Fine::where('user_id', $this->student->id)->sole()->amount); // absent = the time in only
+    }
+
+    public function test_out_only_session_fines_only_a_missed_time_out(): void
+    {
+        $event = $this->endedSession(false, true);
+        $tapped = $this->student('LGC25-200004');
+        Attendance::create(['event_id' => $event->id, 'event_session_id' => $event->sessions->first()->id, 'user_id' => $tapped->id, 'status' => 'present', 'time_out_at' => now()]);
+
+        $event->markAbsentees();
+
+        $this->assertSame(0, Fine::where('user_id', $tapped->id)->count());
+        $this->assertSame('present', Attendance::where('user_id', $tapped->id)->value('status'));
+        $this->assertEquals(50, Fine::where('user_id', $this->student->id)->sole()->amount);
     }
 
     public function test_scheduled_processing_charges_fines(): void

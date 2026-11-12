@@ -74,7 +74,7 @@ class SemesterTest extends TestCase
             'name' => 'Past',
             'start_time' => now()->subHours(2),
             'end_time' => now()->subHour(),
-            'absent_fine' => 30,
+            'missed_in_fine' => 30,
         ]);
 
         $event->markAbsentees();
@@ -94,7 +94,7 @@ class SemesterTest extends TestCase
             'name' => 'Past',
             'start_time' => now()->subHours(2),
             'end_time' => now()->subHour(),
-            'absent_fine' => 30,
+            'missed_in_fine' => 30,
         ]);
         $ended->markAbsentees();
         $this->assertSame(0, Attendance::where('user_id', $this->student->id)->count());

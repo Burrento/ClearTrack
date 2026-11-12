@@ -35,14 +35,14 @@
             $open = $session->isInOpen() || $session->isOutOpen();
         @endphp
         <li @class(['panel px-4 py-3', 'border-seal ring-2 ring-seal/20' => $open])>
-            <p class="font-bold">{{ $session->label() }} <span class="font-normal text-ink-soft">{{ $session->times() }}</span></p>
+            <p class="font-bold">{{ $session->label() }} <span class="font-normal text-ink-soft">{{ $session->times() }}, {{ $session->taps() }}</span></p>
             <p @class(['text-sm', 'font-semibold text-seal-deep' => $open, 'text-ink-soft' => !$open])>
                 @if($session->isOutOpen())
                     Time out open until {{ $session->outClosesAt()->format('g:i A') }}
                 @elseif($session->isInOpen())
                     Time in open{{ $session->starts_at->isFuture() ? ', late after ' . $session->starts_at->format('g:i A') : ', taps now are late' }}
-                @elseif($session->inOpensAt()->isFuture())
-                    Time in opens {{ $session->inOpensAt()->format('g:i A') }}
+                @elseif($session->state() === 'upcoming')
+                    {{ $session->has_in ? 'Time in' : 'Time out' }} opens {{ $session->opensAt()->format('g:i A') }}
                 @else
                     Closed
                 @endif

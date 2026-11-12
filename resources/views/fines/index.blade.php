@@ -4,7 +4,12 @@
 @php $unpaid = $fines->where('status', 'unpaid'); @endphp
 
 <x-page-header title="Fines"
-    :description="$unpaid->count() . ' unpaid, ₱' . number_format($unpaid->sum('amount'), 2) . ' in total. Record a payment when a student pays you.'" />
+    :description="$unpaid->count() . ' unpaid, ₱' . number_format($unpaid->sum('amount'), 2) . ' in total. Record a payment when a student pays you.'">
+    @if($unpaid->isNotEmpty())
+        <a href="{{ route('fines.export', 'csv') }}" class="btn btn-secondary">Export CSV</a>
+        <a href="{{ route('fines.export', 'pdf') }}" target="_blank" class="btn btn-secondary">Export PDF</a>
+    @endif
+</x-page-header>
 
 <div class="panel overflow-x-auto">
     <table class="data-table">

@@ -55,6 +55,8 @@
                 <strong class="text-ink">{{ $session->label() }}:</strong>
                 @if($session->isOutOpen())
                     {{ $a?->time_out_at ? 'you tapped out at ' . $a->time_out_at->format('g:i A') . '. Done.' : 'tap out before ' . $session->outClosesAt()->format('g:i A') . '.' }}
+                @elseif($a?->time_in_at && !$session->has_out)
+                    you tapped in at {{ $a->time_in_at->format('g:i A') }}. Done.
                 @elseif($a?->time_in_at)
                     you tapped in at {{ $a->time_in_at->format('g:i A') }}. Tap out from {{ $session->outOpensAt()->format('g:i A') }} to {{ $session->outClosesAt()->format('g:i A') }}.
                 @elseif($session->starts_at->isFuture())

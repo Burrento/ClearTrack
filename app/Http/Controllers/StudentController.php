@@ -36,7 +36,7 @@ class StudentController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'username' => ['required', 'string', 'regex:' . User::STUDENT_ID_PATTERN, 'unique:users'],
             'rfid_uid' => ['nullable', 'string', 'max:255', 'unique:users'],
-            'year_level' => ['required', 'string', 'in:First Year,Second Year,Third Year,Fourth Year,Fifth Year'],
+            'year_level' => ['required', 'string', Rule::in(User::YEAR_LEVELS)],
         ]);
 
         $password = User::defaultPassword($request->name, $request->username);

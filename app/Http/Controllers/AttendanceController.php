@@ -55,7 +55,7 @@ class AttendanceController extends Controller
         // ponytail: two readers tapping the same card in the same instant can hit the unique index; tap again
         $attendance = Attendance::firstOrNew(
             ['event_session_id' => $session->id, 'user_id' => $user->id],
-            ['event_id' => $event->id, 'status' => 'missed_in']
+            ['event_id' => $event->id, 'status' => $session->has_in ? 'missed_in' : 'present']
         );
 
         if ($action === 'in') {

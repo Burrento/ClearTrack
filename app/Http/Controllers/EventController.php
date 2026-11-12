@@ -236,7 +236,6 @@ class EventController extends Controller
             'requires_survey' => 'boolean',
             'year_levels' => 'nullable|array',
             'year_levels.*' => ['string', Rule::in(User::YEAR_LEVELS)],
-            'absent_fine' => 'required|numeric|min:0|max:100000',
             'late_fine' => 'required|numeric|min:0|max:100000',
             'missed_in_fine' => 'required|numeric|min:0|max:100000',
             'missed_out_fine' => 'required|numeric|min:0|max:100000',
@@ -273,7 +272,18 @@ class EventController extends Controller
                 throw ValidationException::withMessages(["sessions.$name" => ucfirst($name) . ' must start after the session before it ends.']);
             }
 
-            $sessions[$name] = ['starts_at' => $start, 'ends_at' => $end];
+            $taps = ['has_in' => !empty($input['has_in']), 'has_out' => !empty($input['has_out'])];
+            $saved = $event?->sessions->firstWhere('name', $name);
+            if (!$taps['has_in'] && !$taps['has_out']) {
+                throw ValidationException::withMessages(["sessions.$name" => 'Tick time in, time out or both for ' . $name . '.']);
+            }
+            foreach (['has_in' => ['time_in_at', 'time in'], 'has_out' => ['time_out_at', 'time out']] as $flag => [$column, $label]) {
+                if ($saved && !$taps[$flag] && $saved->attendances()->whereNotNull($column)->exists()) {
+                    throw ValidationException::withMessages(["sessions.$name" => ucfirst($name) . " already has taps for $label, so it can't be turned off."]);
+                }
+            }
+
+            $sessions[$name] = ['starts_at' => $start, 'ends_at' => $end] + $taps;
             $previousEnd = $end;
         }
 

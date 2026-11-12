@@ -21,7 +21,7 @@
 
     <fieldset>
         <legend class="label">Sessions</legend>
-        <p class="hint mt-0 mb-3">Students tap in and out of each session. Time in opens 1 hour before the start, and tapping in after the start is late. Time out is open from 30 minutes before the end until 30 minutes after.</p>
+        <p class="hint mt-0 mb-3">Tick which taps each session takes. Time in opens 1 hour before the start, and tapping in after the start is late. Time out is open from 30 minutes before the end until 30 minutes after. A session with time in only takes time ins until it ends.</p>
         <div class="panel divide-y divide-rule">
             @foreach($defaults as $name => [$defaultStart, $defaultEnd])
                 @php
@@ -41,6 +41,15 @@
                         <label for="{{ $name }}_end" class="sr-only">{{ ucfirst($name) }} end</label>
                         <input type="time" name="sessions[{{ $name }}][end]" id="{{ $name }}_end" class="input w-36" :disabled="!on"
                             value="{{ old("sessions.$name.end", $saved?->ends_at->format('H:i') ?? $defaultEnd) }}">
+                    </div>
+                    <div class="flex items-center gap-5" :class="!on && 'opacity-40'">
+                        @foreach(['has_in' => 'Time in', 'has_out' => 'Time out'] as $flag => $tapLabel)
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" name="sessions[{{ $name }}][{{ $flag }}]" value="1" class="checkbox" :disabled="!on"
+                                    @checked(old("sessions.$name.$flag", $saved ? $saved->$flag : !old('name')))>
+                                {{ $tapLabel }}
+                            </label>
+                        @endforeach
                     </div>
                     @error("sessions.$name") <p class="field-error mt-0 w-full">{{ $message }}</p> @enderror
                 </div>
@@ -69,24 +78,23 @@
         <legend class="label">Fines, per session</legend>
         <div class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
             @foreach([
-                'absent_fine' => 'Absent (no taps at all)',
-                'late_fine' => 'Late time in',
-                'missed_in_fine' => 'No time in (only tapped out)',
+                'missed_in_fine' => 'No time in',
                 'missed_out_fine' => 'No time out',
+                'late_fine' => 'Late time in',
             ] as $field => $label)
                 <div>
                     <label for="{{ $field }}" class="mb-1.5 block text-[0.9375rem] text-ink-soft">{{ $label }}</label>
                     <div class="relative">
                         <span class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-soft" aria-hidden="true">₱</span>
                         <input type="number" name="{{ $field }}" id="{{ $field }}" required min="0" step="0.01" inputmode="decimal"
-                            value="{{ old($field, $event ? (float) $event->$field : 0) }}"
+                            value="{{ old($field, $event ? (float) $event->$field : ['missed_in_fine' => 50, 'missed_out_fine' => 50, 'late_fine' => 20][$field]) }}"
                             @class(['input pl-8', 'input-invalid' => $errors->has($field)])>
                     </div>
                     @error($field) <p class="field-error">{{ $message }}</p> @enderror
                 </div>
             @endforeach
         </div>
-        <p class="hint">Charged when absences are processed after the last session. Late and no time out can both apply. Enter 0 for no fine.</p>
+        <p class="hint">Charged when absences are processed after the last session. A student with no taps at all is fined no time in + no time out. Late and no time out can both apply. Enter 0 for no fine.</p>
     </fieldset>
 
     <label class="flex items-start gap-3">

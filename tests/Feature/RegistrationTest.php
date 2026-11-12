@@ -114,6 +114,10 @@ class RegistrationTest extends TestCase
         $this->assertNotNull($user);
         $this->assertSame($officer->department_id, $user->department_id);
         $this->assertTrue($user->hasRole('student'));
+
+        // Fifth Year was dropped
+        $this->post('/students', ['name' => 'Old Level', 'username' => 'LGC25-105682', 'year_level' => 'Fifth Year'])
+            ->assertSessionHasErrors('year_level');
     }
 
     public function test_rfid_serial_is_stored_bare_and_displayed_with_colons(): void

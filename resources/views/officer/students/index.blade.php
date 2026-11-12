@@ -2,7 +2,7 @@
 
 @section('content')
 @php
-    $yearLevels = ['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'];
+    $yearLevels = \App\Models\User::YEAR_LEVELS;
     $activeCount = $students->where('is_active', true)->count();
 @endphp
 
@@ -157,7 +157,7 @@
                         <ul class="mt-1 list-disc space-y-0.5 pl-5 text-ink-soft">
                             <li><strong class="text-ink">name</strong>: e.g. <span class="code">Dela Cruz, Juan</span> (last name first with a comma for two-word last names)</li>
                             <li><strong class="text-ink">student_id</strong>: e.g. <span class="code">LGC26-6578</span> or <span class="code">LGC25-105680</span></li>
-                            <li><strong class="text-ink">year_level</strong>: First Year, Second Year, Third Year, Fourth Year or Fifth Year</li>
+                            <li><strong class="text-ink">year_level</strong>: First Year, Second Year, Third Year or Fourth Year</li>
                         </ul>
                     </li>
                     <li>Save as <strong>CSV</strong> and upload it here.</li>

@@ -36,8 +36,7 @@ class EventSessionsTest extends TestCase
         return $extra + [
             'name' => 'Nurses Week, Day 1',
             'date' => $this->day->toDateString(),
-            'sessions' => $sessions,
-            'absent_fine' => 50,
+            'sessions' => array_map(fn ($s) => array_filter($s + ['has_in' => '1', 'has_out' => '1']), $sessions), // '0' = unticked
             'late_fine' => 20,
             'missed_in_fine' => 15,
             'missed_out_fine' => 10,
@@ -100,6 +99,26 @@ class EventSessionsTest extends TestCase
         $this->assertSame('11:40', $morning->time_out_at->format('H:i'));
 
         $this->tapAt($event, '13:05')->assertJson(['action' => 'in', 'status' => 'late', 'session' => 'Afternoon']);
+    }
+
+    public function test_in_only_and_out_only_sessions(): void
+    {
+        $this->actingAs($this->officer)->post(route('events.store'), $this->form([
+            'morning' => ['enabled' => '1', 'start' => '08:00', 'end' => '12:00', 'has_out' => '0'],
+            'afternoon' => ['enabled' => '1', 'start' => '13:00', 'end' => '17:00', 'has_in' => '0'],
+        ]))->assertSessionHasNoErrors();
+        $event = Event::latest('id')->first();
+        $this->assertSame([[true, false], [false, true]], $event->sessions->map(fn ($s) => [$s->has_in, $s->has_out])->all());
+
+        // Morning takes time ins until its end, no time out; the afternoon only takes time outs
+        $this->tapAt($event, '11:50')->assertJson(['action' => 'in', 'status' => 'late', 'session' => 'Morning']);
+        $this->tapAt($event, '12:10')->assertStatus(422); // morning closed at 12:00, afternoon time out opens 16:30
+        $this->tapAt($event, '16:40')->assertJson(['action' => 'out', 'session' => 'Afternoon', 'status' => 'present']);
+        $this->assertNull($this->row($event, 'morning')->time_out_at);
+
+        // Each session needs at least one tap
+        $this->post(route('events.store'), $this->form(['morning' => ['enabled' => '1', 'start' => '08:00', 'end' => '12:00', 'has_in' => '0', 'has_out' => '0']]))
+            ->assertSessionHasErrors('sessions.morning');
     }
 
     public function test_overlapping_out_and_in_windows(): void

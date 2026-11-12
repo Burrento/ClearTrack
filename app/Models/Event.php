@@ -110,7 +110,7 @@ class Event extends Model
 
     public function checkInOpensAt()
     {
-        return $this->sessions->map->inOpensAt()->min();
+        return $this->sessions->map->opensAt()->min();
     }
 
     /**
@@ -188,8 +188,9 @@ class Event extends Model
 
     /**
      * After the last time out closes: for every active department student and every session,
-     * mark no taps as absent and tap-out-only as missed_in, then fine absent, late, missed time in
-     * and missed time out with this event's amounts. Runs once per event. Returns counts per kind.
+     * mark no taps as absent and tap-out-only as missed_in, then fine late, missed time in and missed
+     * time out with this event's amounts, for the taps each session takes. Absent is one fine worth
+     * no time in + no time out. Runs once per event. Returns counts per kind.
      */
     public function markAbsentees(): array
     {
@@ -201,7 +202,9 @@ class Event extends Model
 
             $fine = function (User $student, string $kind, EventSession $session) use ($semesterId, &$counts) {
                 $counts[$kind]++;
-                $amount = $this->{$kind . '_fine'};
+                $amount = $kind === 'absent'
+                    ? ($session->has_in ? $this->missed_in_fine : 0) + ($session->has_out ? $this->missed_out_fine : 0)
+                    : $this->{$kind . '_fine'};
                 if ($amount > 0) {
                     Fine::create([
                         'user_id' => $student->id,
@@ -229,14 +232,16 @@ class Event extends Model
                         continue;
                     }
 
-                    if (!$row->time_in_at) {
+                    if (!$session->has_in) {
+                        // out-only session: tapping out is all it asks
+                    } elseif (!$row->time_in_at) {
                         $row->update(['status' => 'missed_in']);
                         $fine($student, 'missed_in', $session);
                     } elseif ($row->status === 'late') {
                         $fine($student, 'late', $session);
                     }
 
-                    if (!$row->time_out_at) {
+                    if ($session->has_out && !$row->time_out_at) {
                         $fine($student, 'missed_out', $session);
                     }
                 }

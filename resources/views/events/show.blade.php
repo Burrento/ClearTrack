@@ -18,7 +18,7 @@
             'late' => $rows->contains(fn ($a) => $a?->status === 'late'),
             'absent' => $rows->contains(fn ($a) => !$a || $a->status === 'absent'),
             'no_in' => $rows->contains(fn ($a) => $a?->status === 'missed_in'),
-            'no_out' => $rows->contains(fn ($a) => $a && $a->time_in_at && !$a->time_out_at),
+            'no_out' => $sessions->contains(fn ($s) => $s->has_out && ($a = $r['sessions']->get($s->id)) && $a->time_in_at && !$a->time_out_at),
         ];
     });
 @endphp
@@ -32,8 +32,8 @@
 <div class="-mt-4 mb-8 space-y-1 text-ink-soft">
     <p class="flex flex-wrap items-center gap-x-4 gap-y-2"><x-event-phase :event="$event" /> {{ $event->schedule() }}</p>
     <p>For: <strong class="text-ink">{{ $event->audience() }}</strong></p>
-    <p>Fines per session: {{ $money($event->absent_fine) }} absent, {{ $money($event->late_fine) }} late,
-        {{ $money($event->missed_in_fine) }} no time in, {{ $money($event->missed_out_fine) }} no time out.</p>
+    <p>Fines per session: {{ $money($event->missed_in_fine) }} no time in, {{ $money($event->missed_out_fine) }} no time out,
+        {{ $money($event->late_fine) }} late. Absent (no taps) is both no time in and no time out.</p>
 </div>
 
 {{-- Actions, in the order an officer uses them --}}
@@ -90,10 +90,10 @@
         @foreach($event->sessions as $session)
             <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                 <div>
-                    <p class="font-semibold">{{ $session->label() }} <span class="font-normal text-ink-soft">{{ $session->times() }}</span></p>
+                    <p class="font-semibold">{{ $session->label() }} <span class="font-normal text-ink-soft">{{ $session->times() }}, {{ $session->taps() }}</span></p>
                     <p class="text-sm text-ink-soft">
                         @switch($session->state())
-                            @case('upcoming') Time in opens {{ $session->inOpensAt()->format($session->inOpensAt()->isToday() ? 'g:i A' : 'M j, g:i A') }} @break
+                            @case('upcoming') {{ $session->has_in ? 'Time in' : 'Time out' }} opens {{ $session->opensAt()->format($session->opensAt()->isToday() ? 'g:i A' : 'M j, g:i A') }} @break
                             @case('in') <span class="font-semibold text-seal-deep">Time in open</span>{{ $session->starts_at->isFuture() ? ', late after ' . $session->starts_at->format('g:i A') : ', taps now are late' }} @break
                             @case('out') <span class="font-semibold text-seal-deep">Time out open</span> until {{ $session->outClosesAt()->format('g:i A') }} @break
                             @case('closed') Ended early at {{ $session->closed_at->format('g:i A') }} @break
@@ -148,7 +148,7 @@
                 <span class="sr-only">Year level</span>
                 <select x-model="year" class="input">
                     <option value="">All year levels</option>
-                    @foreach(['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'] as $level)
+                    @foreach(\App\Models\User::YEAR_LEVELS as $level)
                         <option value="{{ $level }}">{{ $level }}</option>
                     @endforeach
                 </select>
@@ -190,7 +190,9 @@
                                 </td>
                             @else
                                 <td class="whitespace-nowrap">
-                                    @if($a->time_in_at)
+                                    @if(!$session->has_in)
+                                        <span class="text-ink-soft">Not needed</span>
+                                    @elseif($a->time_in_at)
                                         {{ $a->time_in_at->format('g:i A') }}
                                         @if($a->status === 'late') <x-badge tone="wait">Late</x-badge> @endif
                                     @else
@@ -198,7 +200,9 @@
                                     @endif
                                 </td>
                                 <td class="whitespace-nowrap">
-                                    @if($a->time_out_at)
+                                    @if(!$session->has_out)
+                                        <span class="text-ink-soft">Not needed</span>
+                                    @elseif($a->time_out_at)
                                         {{ $a->time_out_at->format('g:i A') }}
                                     @elseif($event->fines_processed)
                                         <x-badge tone="bad">No time out</x-badge>

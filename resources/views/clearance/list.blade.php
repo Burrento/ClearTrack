@@ -3,7 +3,7 @@
 @section('content')
 @php
     $clearedCount = $students->whereNull('unpaid_total')->count();
-    $yearLevels = ['First Year', 'Second Year', 'Third Year', 'Fourth Year', 'Fifth Year'];
+    $yearLevels = \App\Models\User::YEAR_LEVELS;
     // What the search and filters match against, one entry per row
     $rows = $students->map(fn ($s) => [
         'text' => strtolower($s->name . ' ' . $s->username),

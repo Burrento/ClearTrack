@@ -27,14 +27,15 @@
                                     @if(!$a || $a->status === 'absent')
                                         @if($a || $event->fines_processed) <x-badge tone="bad">Absent</x-badge> @else <span class="text-ink-soft">No taps yet</span> @endif
                                     @else
-                                        @if($a->time_in_at)
+                                        @if(!$session->has_in)
+                                        @elseif($a->time_in_at)
                                             <x-badge :tone="$a->status === 'late' ? 'wait' : 'good'">{{ $a->status === 'late' ? 'Late' : 'In' }} {{ $a->time_in_at->format('g:i A') }}</x-badge>
                                         @else
                                             <x-badge tone="bad">No time in</x-badge>
                                         @endif
                                         @if($a->time_out_at)
                                             <x-badge tone="good">Out {{ $a->time_out_at->format('g:i A') }}</x-badge>
-                                        @elseif($event->fines_processed)
+                                        @elseif($event->fines_processed && $session->has_out)
                                             <x-badge tone="bad">No time out</x-badge>
                                         @endif
                                     @endif

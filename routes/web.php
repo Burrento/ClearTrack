@@ -55,6 +55,7 @@ Route::middleware('auth')->group(function () {
         Route::post('events/{event}/survey', [SurveyController::class, 'store'])->name('surveys.store');
 
         Route::get('fines', [FineController::class, 'index'])->name('fines.index');
+        Route::get('fines/export/{format}', [FineController::class, 'export'])->whereIn('format', ['csv', 'pdf'])->name('fines.export');
         Route::post('fines/{fine}/pay', [FineController::class, 'markAsPaid'])->name('fines.markAsPaid');
 
         Route::post('events/{event}/process-fines', [EventController::class, 'processFines'])->name('events.processFines');
