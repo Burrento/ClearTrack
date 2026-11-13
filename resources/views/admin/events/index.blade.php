@@ -57,19 +57,5 @@
     </table>
 </div>
 
-@if($events->hasPages())
-    <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Event pages">
-        @if($events->onFirstPage())
-            <span class="btn btn-secondary btn-sm opacity-50">Previous</span>
-        @else
-            <a href="{{ $events->previousPageUrl() }}" class="btn btn-secondary btn-sm">Previous</a>
-        @endif
-        <span class="text-sm text-ink-soft">Page {{ $events->currentPage() }} of {{ $events->lastPage() }}</span>
-        @if($events->hasMorePages())
-            <a href="{{ $events->nextPageUrl() }}" class="btn btn-secondary btn-sm">Next</a>
-        @else
-            <span class="btn btn-secondary btn-sm opacity-50">Next</span>
-        @endif
-    </nav>
-@endif
+<x-pager :items="$events" label="Event pages" />
 @endsection

@@ -100,19 +100,5 @@
     </table>
 </div>
 
-@if($students->hasPages())
-    <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Student pages">
-        @if($students->onFirstPage())
-            <span class="btn btn-secondary btn-sm opacity-50">Previous</span>
-        @else
-            <a href="{{ $students->previousPageUrl() }}" class="btn btn-secondary btn-sm">Previous</a>
-        @endif
-        <span class="text-sm text-ink-soft">Page {{ $students->currentPage() }} of {{ $students->lastPage() }}</span>
-        @if($students->hasMorePages())
-            <a href="{{ $students->nextPageUrl() }}" class="btn btn-secondary btn-sm">Next</a>
-        @else
-            <span class="btn btn-secondary btn-sm opacity-50">Next</span>
-        @endif
-    </nav>
-@endif
+<x-pager :items="$students" label="Student pages" />
 @endsection

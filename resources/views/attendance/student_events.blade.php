@@ -64,5 +64,7 @@
             </li>
         @endforeach
     </ul>
+
+    <x-pager :items="$events" label="Event pages" />
 @endif
 @endsection

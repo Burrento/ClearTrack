@@ -115,7 +115,7 @@ class AttendanceController extends Controller
         $user = Auth::user();
         $events = Event::forStudent($user)
             ->orderBy('start_time', 'desc')
-            ->get();
+            ->paginate(20);
 
         return view('attendance.student_events', compact('events'));
     }

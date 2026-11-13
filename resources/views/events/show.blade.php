@@ -124,15 +124,25 @@
     </ul>
 </section>
 
+{{-- Search and filters run in the browser; 50 matching rows a page. visible[i] says whether row i is on this page. --}}
 <section aria-labelledby="log-heading" x-data="{
-        search: '', year: '', show: '', rows: @js($filterRows),
+        search: '', year: '', show: '', rows: @js($filterRows), page: 1, perPage: 50, shown: {{ $byStudent->count() }}, visible: [],
         matches(row) {
             return (this.search === '' || row.text.includes(this.search.toLowerCase()))
                 && (this.year === '' || row.year === this.year)
                 && (this.show === '' || row[this.show]);
         },
-        get shown() { return this.rows.filter((row) => this.matches(row)).length },
-    }">
+        get pages() { return Math.max(1, Math.ceil(this.shown / this.perPage)) },
+        refresh() {
+            const from = (this.page - 1) * this.perPage;
+            let n = 0;
+            this.visible = this.rows.map((row) => this.matches(row) && n++ >= from && n <= from + this.perPage);
+            this.shown = n;
+        },
+        go(page) { this.page = Math.min(Math.max(1, page), this.pages); this.$nextTick(() => this.$root.scrollIntoView({ block: 'start' })) },
+    }"
+    x-init="refresh(); $watch('search', () => page = 1); $watch('year', () => page = 1); $watch('show', () => page = 1)"
+    x-effect="search; year; show; page; refresh()">
     <h2 id="log-heading" class="panel-title mb-4">Attendance</h2>
 
     @if($byStudent->isNotEmpty())
@@ -180,7 +190,7 @@
             </thead>
             <tbody>
                 @forelse($byStudent as $row)
-                    <tr x-show="matches(rows[{{ $loop->index }}])">
+                    <tr x-show="visible[{{ $loop->index }}]" @if($loop->index >= 50) style="display: none" @endif>
                         <td class="font-semibold whitespace-nowrap">{{ $row['user']->name }}</td>
                         @foreach($sessions as $session)
                             @php $a = $row['sessions']->get($session->id); @endphp
@@ -230,6 +240,12 @@
             </tbody>
         </table>
     </div>
+
+    <nav x-show="pages > 1" class="mt-4 flex items-center justify-between gap-3" aria-label="Attendance pages" @if($byStudent->count() <= 50) style="display: none" @endif>
+        <button type="button" class="btn btn-secondary btn-sm" :disabled="page === 1" :class="page === 1 && 'opacity-50'" @click="go(page - 1)">Previous</button>
+        <span class="text-sm text-ink-soft">Page <span x-text="page">1</span> of <span x-text="pages">{{ max(1, (int) ceil($byStudent->count() / 50)) }}</span></span>
+        <button type="button" class="btn btn-secondary btn-sm" :disabled="page === pages" :class="page === pages && 'opacity-50'" @click="go(page + 1)">Next</button>
+    </nav>
 </section>
 @endsection
 

@@ -24,7 +24,7 @@ class EventController extends Controller
         $events = Event::where('department_id', Auth::user()->department_id)
             ->with('sessions')
             ->orderBy('start_time', 'desc')
-            ->get();
+            ->paginate(20);
 
         return view('events.index', compact('events'));
     }

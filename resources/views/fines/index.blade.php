@@ -111,19 +111,5 @@
     </table>
 </div>
 
-@if($groups->hasPages())
-    <nav class="mt-4 flex items-center justify-between gap-3" aria-label="Fine pages">
-        @if($groups->onFirstPage())
-            <span class="btn btn-secondary btn-sm opacity-50">Previous</span>
-        @else
-            <a href="{{ $groups->previousPageUrl() }}" class="btn btn-secondary btn-sm">Previous</a>
-        @endif
-        <span class="text-sm text-ink-soft">Page {{ $groups->currentPage() }} of {{ $groups->lastPage() }}</span>
-        @if($groups->hasMorePages())
-            <a href="{{ $groups->nextPageUrl() }}" class="btn btn-secondary btn-sm">Next</a>
-        @else
-            <span class="btn btn-secondary btn-sm opacity-50">Next</span>
-        @endif
-    </nav>
-@endif
+<x-pager :items="$groups" label="Fine pages" />
 @endsection

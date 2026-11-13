@@ -66,4 +66,6 @@
         </tbody>
     </table>
 </div>
+
+<x-pager :items="$events" label="Event pages" />
 @endsection
