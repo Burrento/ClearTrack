@@ -40,6 +40,16 @@ class Event extends Model
         return $this->hasMany(Attendance::class);
     }
 
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function fines()
+    {
+        return $this->hasMany(Fine::class);
+    }
+
     /**
      * Get the survey for the event.
      */
@@ -184,6 +194,36 @@ class Event extends Model
     {
         return $this->start_time->format('D, M j') . ': '
             . $this->sessions->map(fn ($s) => $s->label() . ' ' . $s->times())->implode(', ');
+    }
+
+    /**
+     * Charges a processed event again after an admin changed its session ticks or fine amounts:
+     * removes its unpaid fines, clears the statuses processing set, and processes it again under the
+     * semester it was first charged in. Paid fines are never charged twice: a new fine matching a paid
+     * one (same student and reason) is dropped. Returns [counts, paid fines that no longer apply].
+     */
+    public function reprocess(): array
+    {
+        return DB::transaction(function () {
+            $semesterId = $this->fines()->value('semester_id');
+            $paid = $this->fines()->where('status', 'paid')->with('user')->get();
+            $this->fines()->where('status', 'unpaid')->delete();
+            $this->attendances()->where('status', 'missed_in')->update(['status' => 'present']); // re-marked if still missing
+
+            $this->update(['fines_processed' => false]);
+            $counts = $this->markAbsentees();
+
+            $new = $this->fines()->where('status', 'unpaid')->get();
+            if ($semesterId) {
+                $this->fines()->where('status', 'unpaid')->update(['semester_id' => $semesterId]);
+            }
+            $key = fn (Fine $fine) => $fine->user_id . '|' . $fine->reason;
+            $paidKeys = $paid->map($key)->flip();
+            $new->filter(fn ($fine) => $paidKeys->has($key($fine)))->each->delete();
+            $newKeys = $new->map($key)->flip();
+
+            return [$counts, $paid->reject(fn ($fine) => $newKeys->has($key($fine)))->values()];
+        });
     }
 
     /**

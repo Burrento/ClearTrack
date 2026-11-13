@@ -43,6 +43,7 @@ class LogActivity
         'AdminController@toggleArchive' => 'Archived or restored a department',
         'AdminController@storeOfficer' => 'Added an officer',
         'AdminController@startSemester' => 'Started a new semester',
+        'AdminEventController@reprocess' => 'Fixed and charged an event again',
         'AdminStudentController@update' => 'Edited a student',
         'AdminStudentController@destroy' => 'Deleted a student',
         'BackupController@store' => 'Made a backup',

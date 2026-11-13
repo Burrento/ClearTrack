@@ -22,6 +22,7 @@
                 $link('Semesters', 'admin.semesters'),
                 $link('Departments', 'admin.departments'),
                 $link('Officers', 'admin.officers'),
+                $link('Events', 'admin.events', 'admin.events*'),
                 $link('Students', 'admin.students', 'admin.students*'),
                 $link('Logs', 'admin.logs'),
                 $link('Backups', 'admin.backups', 'admin.backups*'),

@@ -7,6 +7,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\FineController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminEventController;
 use App\Http\Controllers\AdminStudentController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\ClearanceController;
@@ -82,6 +83,9 @@ Route::middleware('auth')->group(function () {
         Route::get('admin/students/{user}/edit', [AdminStudentController::class, 'edit'])->name('admin.students.edit');
         Route::put('admin/students/{user}', [AdminStudentController::class, 'update'])->name('admin.students.update');
         Route::delete('admin/students/{user}', [AdminStudentController::class, 'destroy'])->name('admin.students.destroy');
+        Route::get('admin/events', [AdminEventController::class, 'index'])->name('admin.events');
+        Route::get('admin/events/{event}/fix', [AdminEventController::class, 'edit'])->name('admin.events.edit');
+        Route::put('admin/events/{event}/fix', [AdminEventController::class, 'reprocess'])->name('admin.events.reprocess');
         Route::get('admin/backups', [BackupController::class, 'index'])->name('admin.backups');
         Route::post('admin/backups', [BackupController::class, 'store'])->name('admin.backups.store');
         Route::get('admin/backups/{file}', [BackupController::class, 'download'])->name('admin.backups.download');
