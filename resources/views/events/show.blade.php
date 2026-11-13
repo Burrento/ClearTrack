@@ -185,9 +185,15 @@
                         @foreach($sessions as $session)
                             @php $a = $row['sessions']->get($session->id); @endphp
                             @if(!$a || $a->status === 'absent')
-                                <td colspan="2">
-                                    @if($a) <x-badge tone="bad">Absent</x-badge> @else <span class="text-ink-soft">—</span> @endif
-                                </td>
+                                {{-- No taps: one cell per tap, so neither column looks blank --}}
+                                @foreach([$session->has_in, $session->has_out] as $needed)
+                                    <td class="whitespace-nowrap">
+                                        @if(!$needed) <span class="text-ink-soft">Not needed</span>
+                                        @elseif($a) <x-badge tone="bad">Absent</x-badge>
+                                        @else <span class="text-ink-soft">—</span>
+                                        @endif
+                                    </td>
+                                @endforeach
                             @else
                                 <td class="whitespace-nowrap">
                                     @if(!$session->has_in)
