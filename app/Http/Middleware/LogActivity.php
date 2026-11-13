@@ -50,7 +50,7 @@ class LogActivity
         'BackupController@download' => 'Downloaded a backup',
     ];
 
-    private const SKIP = ['AttendanceController@logRfid', 'FineController@markAsPaid'];
+    private const SKIP = ['AttendanceController@logRfid', 'FineController@markAsPaid', 'FineController@payGroup'];
 
     public function handle(Request $request, Closure $next): Response
     {
