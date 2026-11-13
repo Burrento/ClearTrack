@@ -4,16 +4,34 @@
 @php
     $yearLevels = \App\Models\User::YEAR_LEVELS;
     $activeCount = $students->where('is_active', true)->count();
+    $rows = $students->map(fn ($s) => ['text' => strtolower($s->name . ' ' . $s->username), 'year' => $s->year_level])->values();
 @endphp
 
-<div x-data="{ search: '', yearFilter: '' }"
-    x-init="@if($errors->has('csv')) $refs.import.showModal() @elseif($errors->any()) $refs.register.showModal() @endif">
+{{-- Search and the year filter run in the browser; 50 matching rows a page. visible[i] says whether row i is on this page. --}}
+<div x-data="{
+        search: '', yearFilter: '', rows: @js($rows), page: 1, perPage: 50, shown: {{ $students->count() }}, visible: [],
+        matches(row) {
+            return (this.search === '' || row.text.includes(this.search.toLowerCase()))
+                && (this.yearFilter === '' || row.year === this.yearFilter);
+        },
+        get pages() { return Math.max(1, Math.ceil(this.shown / this.perPage)) },
+        refresh() {
+            const from = (this.page - 1) * this.perPage;
+            let n = 0;
+            this.visible = this.rows.map((row) => this.matches(row) && n++ >= from && n <= from + this.perPage);
+            this.shown = n;
+        },
+        go(page) { this.page = Math.min(Math.max(1, page), this.pages); this.$nextTick(() => this.$refs.list.scrollIntoView({ block: 'start' })) },
+    }"
+    x-init="refresh(); $watch('search', () => page = 1); $watch('yearFilter', () => page = 1);
+        @if($errors->has('csv')) $refs.import.showModal() @elseif($errors->any()) $refs.register.showModal() @endif"
+    x-effect="search; yearFilter; page; refresh()">
     <x-page-header title="Students" :description="$activeCount . ' active ' . \Illuminate\Support\Str::plural('student', $activeCount) . ' in ' . Auth::user()->department->code . '.'">
         <button type="button" @click="$refs.import.showModal()" class="btn btn-secondary">Import CSV</button>
         <button type="button" @click="$refs.register.showModal()" class="btn btn-primary">Register student</button>
     </x-page-header>
 
-    <div class="mb-4 flex flex-wrap gap-3">
+    <div x-ref="list" class="mb-4 flex flex-wrap items-center gap-3">
         <label class="relative w-full sm:w-72">
             <span class="sr-only">Search by name or ID</span>
             <svg class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-soft" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
@@ -30,6 +48,7 @@
                 @endforeach
             </select>
         </label>
+        <p class="text-sm text-ink-soft sm:ml-auto" aria-live="polite">Showing <span x-text="shown">{{ $students->count() }}</span> of {{ $students->count() }}</p>
     </div>
 
     <div class="panel overflow-x-auto">
@@ -46,8 +65,7 @@
             </thead>
             <tbody>
                 @forelse($students as $student)
-                    <tr x-show="(search === '' || @js(strtolower($student->name . ' ' . $student->username)).includes(search.toLowerCase()))
-                                && (yearFilter === '' || @js($student->year_level) === yearFilter)"
+                    <tr x-show="visible[{{ $loop->index }}]" @if($loop->index >= 50) style="display: none" @endif
                         @class(['text-ink-soft' => !$student->is_active])>
                         <td class="font-semibold whitespace-nowrap">{{ $student->name }}</td>
                         <td class="whitespace-nowrap">{{ $student->username }}</td>
@@ -84,9 +102,20 @@
                 @empty
                     <tr><td colspan="6" class="empty">No students yet. Register the first one to start tracking attendance.</td></tr>
                 @endforelse
+                @if($students->isNotEmpty())
+                    <tr x-show="shown === 0" style="display: none">
+                        <td colspan="6" class="empty">No students match. Clear the search or choose another year level.</td>
+                    </tr>
+                @endif
             </tbody>
         </table>
     </div>
+
+    <nav x-show="pages > 1" class="mt-4 flex items-center justify-between gap-3" aria-label="Student pages" @if($students->count() <= 50) style="display: none" @endif>
+        <button type="button" class="btn btn-secondary btn-sm" :disabled="page === 1" :class="page === 1 && 'opacity-50'" @click="go(page - 1)">Previous</button>
+        <span class="text-sm text-ink-soft">Page <span x-text="page">1</span> of <span x-text="pages">{{ max(1, (int) ceil($students->count() / 50)) }}</span></span>
+        <button type="button" class="btn btn-secondary btn-sm" :disabled="page === pages" :class="page === pages && 'opacity-50'" @click="go(page + 1)">Next</button>
+    </nav>
 
     {{-- Register student --}}
     <dialog x-ref="register" @close="$refs.form.reset()"
