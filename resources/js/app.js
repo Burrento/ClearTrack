@@ -150,3 +150,30 @@ function sound(toggle) {
 
     return play;
 }
+
+// Filter bars (form[data-auto-filter]) apply on their own: half a second after typing stops, or as
+// soon as a dropdown or date changes. After the page reloads, the cursor is back in the same field.
+for (const form of document.querySelectorAll('form[data-auto-filter]')) {
+    let timer;
+    const apply = (field) => {
+        clearTimeout(timer);
+        try { sessionStorage.setItem('filter-focus', field.name); } catch { /* private mode: just no refocus */ }
+        form.requestSubmit();
+    };
+    form.addEventListener('input', (e) => {
+        if (!['search', 'text'].includes(e.target.type)) return;
+        clearTimeout(timer);
+        timer = setTimeout(() => apply(e.target), 500);
+    });
+    form.addEventListener('change', (e) => {
+        if (e.target.matches('select, input[type=date]')) apply(e.target);
+    });
+
+    let name = null;
+    try { name = sessionStorage.getItem('filter-focus'); sessionStorage.removeItem('filter-focus'); } catch { /* ignore */ }
+    const field = name && form.elements[name];
+    if (field) {
+        field.focus();
+        try { field.setSelectionRange(field.value.length, field.value.length); } catch { /* selects and dates have no cursor */ }
+    }
+}

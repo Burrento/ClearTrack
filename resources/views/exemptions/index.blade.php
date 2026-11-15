@@ -39,7 +39,7 @@
     </div>
 </form>
 
-<form method="GET" action="{{ route('exemptions.index') }}" class="mb-4 flex flex-wrap items-center gap-3">
+<form method="GET" action="{{ route('exemptions.index') }}" data-auto-filter class="mb-4 flex flex-wrap items-center gap-3">
     <label class="w-full sm:w-64">
         <span class="sr-only">Search by name or ID</span>
         <input type="search" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Search name or ID" class="input">
@@ -53,7 +53,6 @@
             @endforeach
         </select>
     </label>
-    <button type="submit" class="btn btn-secondary">Filter</button>
     @if(array_filter($filters))
         <a href="{{ route('exemptions.index') }}" class="action">Clear</a>
     @endif

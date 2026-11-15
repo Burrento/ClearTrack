@@ -9,7 +9,7 @@
     @endif
 </x-page-header>
 
-<form method="GET" action="{{ route('fines.index') }}" class="mb-4 flex flex-wrap items-center gap-3">
+<form method="GET" action="{{ route('fines.index') }}" data-auto-filter class="mb-4 flex flex-wrap items-center gap-3">
     <label class="relative w-full sm:w-64">
         <span class="sr-only">Search by name or ID</span>
         <svg class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-soft" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
@@ -44,7 +44,6 @@
             <option value="exempted" @selected(($filters['status'] ?? '') === 'exempted')>Exempted</option>
         </select>
     </label>
-    <button type="submit" class="btn btn-secondary">Filter</button>
     @if(array_filter($filters))
         <a href="{{ route('fines.index') }}" class="action">Clear</a>
     @endif

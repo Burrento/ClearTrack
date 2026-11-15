@@ -3,7 +3,7 @@
 @section('content')
 <x-page-header title="Events" description="Every department's events. A processed event can't be changed by officers; fix it here and its fines are charged again." />
 
-<form method="GET" action="{{ route('admin.events') }}" class="mb-4 flex flex-wrap items-center gap-3">
+<form method="GET" action="{{ route('admin.events') }}" data-auto-filter class="mb-4 flex flex-wrap items-center gap-3">
     <label class="w-full sm:w-64">
         <span class="sr-only">Search by event name</span>
         <input type="search" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Search event name" class="input">
@@ -17,7 +17,6 @@
             @endforeach
         </select>
     </label>
-    <button type="submit" class="btn btn-secondary">Filter</button>
     @if(array_filter($filters))
         <a href="{{ route('admin.events') }}" class="action">Clear</a>
     @endif
