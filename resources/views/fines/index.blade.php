@@ -93,6 +93,10 @@
                         @else
                             <x-badge tone="good">Paid</x-badge>
                         @endif
+                        @php $lastPaid = $rowFines->where('status', 'paid')->whereNotNull('paid_at')->sortBy('paid_at')->last(); @endphp
+                        @if($lastPaid)
+                            <span class="mt-1 block text-sm whitespace-nowrap text-ink-soft">by {{ $lastPaid->paidBy?->name ?? 'a removed user' }}, {{ $lastPaid->paid_at->format('M j, g:i A') }}</span>
+                        @endif
                     </td>
                     <td class="text-right">
                         @if($group->unpaid > 0)

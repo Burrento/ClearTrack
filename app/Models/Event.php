@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
  * An event day with one to three sessions (see EventSession). start_time / end_time span all
  * sessions and are kept in step by EventController.
  */
-#[Fillable(['department_id', 'name', 'year_levels', 'start_time', 'end_time', 'absent_fine', 'late_fine', 'missed_in_fine', 'missed_out_fine', 'requires_survey', 'fines_processed'])]
+#[Fillable(['department_id', 'name', 'year_levels', 'start_time', 'end_time', 'absent_fine', 'late_fine', 'missed_in_fine', 'missed_out_fine', 'requires_survey', 'fines_processed', 'fines_processed_at', 'fines_processed_by_id'])]
 class Event extends Model
 {
     protected static function booted(): void
@@ -43,6 +43,12 @@ class Event extends Model
     public function department()
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /** Who processed the absences; nobody (null) with a processed date means the scheduled command did. */
+    public function processedBy()
+    {
+        return $this->belongsTo(User::class, 'fines_processed_by_id');
     }
 
     public function fines()
@@ -80,6 +86,7 @@ class Event extends Model
             'year_levels' => 'array',
             'requires_survey' => 'boolean',
             'fines_processed' => 'boolean',
+            'fines_processed_at' => 'datetime',
         ];
     }
 
@@ -296,7 +303,7 @@ class Event extends Model
                 }
             }
 
-            $this->update(['fines_processed' => true]);
+            $this->update(['fines_processed' => true, 'fines_processed_at' => now(), 'fines_processed_by_id' => auth()->id()]);
 
             return $counts;
         });

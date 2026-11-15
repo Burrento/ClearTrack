@@ -11,13 +11,15 @@ use App\Models\FineExemption;
 use App\Models\Survey;
 use App\Models\User;
 use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Records every action that changes something, in one place, so new actions are logged without
- * touching their controllers. Successful actions only, plus failed logins. Not logged: card taps (each
- * is already an attendance record with the officer who scanned it) and marking fines as paid.
+ * touching their controllers. Successful actions only, plus failed logins. Edits also record what
+ * changed (before → after). Not logged: card taps (each is already an attendance record with the
+ * officer who scanned it).
  */
 class LogActivity
 {
@@ -49,11 +51,23 @@ class LogActivity
         'FineExemptionController@destroy' => 'Removed an exemption',
         'AdminStudentController@update' => 'Edited a student',
         'AdminStudentController@destroy' => 'Deleted a student',
+        'FineController@payGroup' => 'Recorded a payment',
+        'FineController@markAsPaid' => 'Recorded a payment',
         'BackupController@store' => 'Made a backup',
         'BackupController@download' => 'Downloaded a backup',
     ];
 
-    private const SKIP = ['AttendanceController@logRfid', 'FineController@markAsPaid', 'FineController@payGroup'];
+    private const SKIP = ['AttendanceController@logRfid'];
+
+    /** Column => how it's called in "what changed"; columns not listed (timestamps, tokens) aren't shown. */
+    private const FIELDS = [
+        'name' => 'name', 'username' => 'student ID', 'year_level' => 'year level', 'department_id' => 'department',
+        'rfid_uid' => 'RFID card', 'is_active' => 'active', 'password' => 'password', 'code' => 'code',
+        'start_time' => 'start', 'end_time' => 'end', 'year_levels' => 'year levels', 'requires_survey' => 'survey required',
+        'late_fine' => 'late fine', 'missed_in_fine' => 'no time in fine', 'missed_out_fine' => 'no time out fine',
+        'archived_at' => 'archived', 'starts_at' => 'start', 'ends_at' => 'end', 'has_in' => 'time in', 'has_out' => 'time out',
+        'in_opens_at' => 'time in opens', 'closed_at' => 'ended early', 'fines_processed' => 'absences processed',
+    ];
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -71,6 +85,7 @@ class LogActivity
             return $next($request); // not logged in: it gets bounced to the login page, nothing happens
         }
         $subject = $this->subject($request);
+        $before = $this->snapshot($request);
 
         $response = $next($request);
 
@@ -87,11 +102,74 @@ class LogActivity
             'user_id' => ($user ?? $request->user())?->id,
             'action' => $failed ? 'Failed login' : (self::ACTIONS[$action] ?? $request->method() . ' /' . $request->path()),
             'subject' => $action === 'AuthController@login' ? $request->input('username') : $subject,
-            'details' => $failed ? null : $message('status'),
+            'details' => $failed ? null : (trim(($message('status') ?? '') . "\n" . $this->changes($before)) ?: null),
             'ip_address' => $request->ip(),
         ]);
 
         return $response;
+    }
+
+    /**
+     * The route's models (and an event's sessions) as they are before the action, to compare after.
+     */
+    private function snapshot(Request $request): array
+    {
+        $models = [];
+        foreach ($request->route()?->parameters() ?? [] as $value) {
+            if ($value instanceof Model) {
+                $models[] = $value;
+                if ($value instanceof Event) {
+                    array_push($models, ...$value->sessions()->get()->all());
+                }
+            }
+        }
+
+        return array_map(fn (Model $model) => [$model, $model->getAttributes()], $models);
+    }
+
+    /**
+     * "year level: Second Year → Third Year; RFID card changed", for what the action changed.
+     */
+    private function changes(array $before): string
+    {
+        $lines = [];
+        foreach ($before as [$model, $old]) {
+            $fresh = $model->fresh();
+            $prefix = $model instanceof EventSession ? $model->label() . ' ' : '';
+            if (!$fresh) {
+                if ($model instanceof EventSession) {
+                    $lines[] = $model->label() . ' session removed';
+                }
+                continue;
+            }
+            foreach (self::FIELDS as $column => $label) {
+                if (!array_key_exists($column, $old) || (string) $old[$column] === (string) $fresh->getAttributes()[$column]) {
+                    continue;
+                }
+                $new = $fresh->getAttributes()[$column];
+                $lines[] = $prefix . match ($column) {
+                    'password' => 'password reset',
+                    'rfid_uid' => $new ? ($old[$column] ? 'RFID card replaced' : 'RFID card added') : 'RFID card removed',
+                    default => "$label: " . $this->show($column, $old[$column]) . ' → ' . $this->show($column, $new),
+                };
+            }
+        }
+
+        return $lines ? 'Changed: ' . implode('; ', $lines) : '';
+    }
+
+    private function show(string $column, $value): string
+    {
+        return match (true) {
+            $value === null || $value === '' => 'none',
+            $column === 'department_id' => Department::find($value)?->code ?? (string) $value,
+            in_array($column, ['is_active', 'requires_survey', 'has_in', 'has_out', 'fines_processed'], true) => $value ? 'yes' : 'no',
+            in_array($column, ['late_fine', 'missed_in_fine', 'missed_out_fine'], true) => '₱' . number_format((float) $value, 2),
+            $column === 'year_levels' => implode(', ', json_decode($value, true) ?: []) ?: 'all',
+            in_array($column, ['start_time', 'end_time', 'starts_at', 'ends_at', 'in_opens_at', 'closed_at', 'archived_at'], true)
+                => \Illuminate\Support\Carbon::parse($value)->format('M j, g:i A'),
+            default => (string) $value,
+        };
     }
 
     /**
@@ -114,6 +192,10 @@ class LogActivity
             if ($text) {
                 return $text;
             }
+        }
+
+        if (is_numeric($request->input('user_id')) && $student = User::find($request->input('user_id'))) {
+            return "{$student->name} ({$student->username})"; // recording a payment
         }
 
         $name = $request->input('name');

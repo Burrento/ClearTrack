@@ -35,6 +35,12 @@
     <p>For: <strong class="text-ink">{{ $event->audience() }}</strong></p>
     <p>Fines per session: {{ $money($event->missed_in_fine) }} no time in, {{ $money($event->missed_out_fine) }} no time out,
         {{ $money($event->late_fine) }} late. Absent (no taps) is both no time in and no time out.</p>
+    @if($event->fines_processed)
+        <p>Absences processed{{ $event->fines_processed_at ? ' ' . $event->fines_processed_at->format('M j, g:i A') : '' }}
+            @if($event->processedBy) by <strong class="text-ink">{{ $event->processedBy->name }}</strong>
+            @elseif($event->fines_processed_at) automatically, after the last time out closed
+            @endif.</p>
+    @endif
 </div>
 
 {{-- Actions, in the order an officer uses them --}}

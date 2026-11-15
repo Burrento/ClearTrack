@@ -71,11 +71,40 @@ class ActivityLogTest extends TestCase
         $event = Event::create(['department_id' => $this->officer->department_id, 'name' => 'Now', 'start_time' => now()->subMinutes(10), 'end_time' => now()->addHours(2)]);
         $this->postJson(route('attendance.logRfid', $event), ['rfid_uid' => User::role('student')->first()->rfid_uid])->assertOk();
         $this->post(route('admin.backups.store'))->assertForbidden(); // officers can't
-        $fine = \App\Models\Fine::create(['user_id' => User::role('student')->first()->id, 'amount' => 50, 'status' => 'unpaid']);
-        $this->post(route('fines.markAsPaid', $fine));
-        $this->assertSame('paid', $fine->fresh()->status); // marking a fine paid isn't logged
 
         $this->assertSame(0, ActivityLog::count());
+    }
+
+    public function test_payments_and_what_an_edit_changed_are_logged(): void
+    {
+        $this->actingAs($this->officer);
+        $student = User::role('student')->first();
+        $student->update(['name' => 'Santos, Ana', 'year_level' => 'Second Year']);
+        $event = Event::create(['department_id' => $this->officer->department_id, 'name' => 'Assembly', 'start_time' => now()->subHours(3), 'end_time' => now()->subHours(2)]);
+        $fine = \App\Models\Fine::create(['user_id' => $student->id, 'event_id' => $event->id, 'amount' => 50, 'status' => 'unpaid']);
+
+        $this->post(route('fines.payGroup'), ['user_id' => $student->id, 'event_id' => $event->id]);
+        $this->assertSame(['Recorded a payment', "Santos, Ana ({$student->username})", 'Payment of ₱50.00 recorded for Santos, Ana (Assembly).'],
+            [$this->latest()->action, $this->latest()->subject, $this->latest()->details]);
+        $this->assertSame($this->officer->id, $fine->fresh()->paid_by_id); // and the fine remembers who
+        $this->get(route('fines.index'))->assertSee('by ' . $this->officer->name);
+
+        $this->put(route('students.update', $student), ['name' => 'Santos, Ana', 'username' => $student->username, 'year_level' => 'Third Year', 'rfid_uid' => '', 'reset_password' => '1']);
+        $this->assertSame('Edited a student', $this->latest()->action);
+        $this->assertStringContainsString('Changed: year level: Second Year → Third Year; RFID card removed; password reset', $this->latest()->details);
+        $this->assertStringNotContainsString('$2y$', $this->latest()->details); // never the password hash
+    }
+
+    public function test_event_page_shows_who_processed_the_absences(): void
+    {
+        $event = Event::create(['department_id' => $this->officer->department_id, 'name' => 'Assembly', 'start_time' => now()->subHours(3), 'end_time' => now()->subHours(2)]);
+        $this->actingAs($this->officer)->post(route('events.processFines', $event));
+        $this->get(route('events.show', $event))->assertSeeText('Absences processed')->assertSeeText('by ' . $this->officer->name);
+
+        $auto = Event::create(['department_id' => $this->officer->department_id, 'name' => 'Seminar', 'start_time' => now()->subHours(3), 'end_time' => now()->subHours(2)]);
+        auth()->logout();
+        $this->artisan('cleartrack:process-fines');
+        $this->actingAs($this->officer)->get(route('events.show', $auto))->assertSee('automatically');
     }
 
     public function test_admin_views_and_filters_logs_and_others_cannot(): void

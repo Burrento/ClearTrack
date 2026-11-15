@@ -44,7 +44,7 @@ class FinesPageTest extends TestCase
 
         // One payment covers the whole event, not Day 2
         $this->post(route('fines.payGroup'), ['user_id' => $ana->id, 'event_id' => $day1->id])
-            ->assertSessionHas('status', 'Payment of ₱300.00 recorded for Santos, Ana.');
+            ->assertSessionHas('status', 'Payment of ₱300.00 recorded for Santos, Ana (Nurses Week, Day 1).');
         $this->assertSame(0, Fine::where('event_id', $day1->id)->where('status', 'unpaid')->count());
         $this->assertSame('unpaid', Fine::where('event_id', $day2->id)->value('status'));
 

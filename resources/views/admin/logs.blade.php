@@ -58,7 +58,7 @@
                     <td class="align-top">
                         <span @class(['block font-semibold', 'text-alarm' => $log->action === 'Failed login'])>{{ $log->action }}</span>
                         @if($log->subject) <span class="block">{{ $log->subject }}</span> @endif
-                        @if($log->details) <span class="block text-sm text-ink-soft">{{ $log->details }}</span> @endif
+                        @if($log->details) <span class="block text-sm whitespace-pre-line text-ink-soft">{{ $log->details }}</span> @endif
                     </td>
                     <td class="code align-top text-sm whitespace-nowrap text-ink-soft">{{ $log->ip_address }}</td>
                 </tr>

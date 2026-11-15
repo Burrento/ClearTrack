@@ -43,7 +43,7 @@ class FineController extends Controller
             ->paginate(50)->withQueryString();
 
         // The fines behind this page's rows, to list each one's reasons
-        $fines = $this->departmentScope()->with('semester')
+        $fines = $this->departmentScope()->with(['semester', 'paidBy'])
             ->whereIn('user_id', $groups->pluck('user_id'))
             ->where(fn ($q) => $q->whereIn('event_id', $groups->pluck('event_id')->filter())->orWhereNull('event_id'))
             ->orderBy('id')->get()->groupBy(fn ($f) => $f->user_id . '|' . $f->event_id);
@@ -73,9 +73,11 @@ class FineController extends Controller
             ->when($validated['event_id'] ?? null, fn ($q, $id) => $q->where('event_id', $id), fn ($q) => $q->whereNull('event_id'));
         $total = (clone $fines)->sum('amount');
         abort_if((clone $fines)->doesntExist(), 404);
-        $fines->update(['status' => 'paid']);
+        $fines->update(['status' => 'paid', 'paid_at' => now(), 'paid_by_id' => Auth::id()]);
+        $event = isset($validated['event_id']) ? Event::find($validated['event_id']) : null;
 
-        return back()->with('status', 'Payment of ₱' . number_format($total, 2) . ' recorded for ' . User::find($validated['user_id'])?->name . '.');
+        return back()->with('status', 'Payment of ₱' . number_format($total, 2) . ' recorded for ' . User::find($validated['user_id'])?->name
+            . ' (' . ($event?->name ?? 'clearance fines') . ').');
     }
 
     /** Students who still owe (ID, name, status, unpaid amount), as a CSV or a printable page saved as PDF. */
@@ -132,7 +134,7 @@ class FineController extends Controller
             }
         }
 
-        $fine->update(['status' => 'paid']);
+        $fine->update(['status' => 'paid', 'paid_at' => now(), 'paid_by_id' => Auth::id()]);
 
         return back()->with('status', 'Payment recorded.');
     }
