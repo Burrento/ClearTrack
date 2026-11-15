@@ -87,6 +87,8 @@
                     </span>
                     @if($fine->status === 'paid')
                         <x-badge tone="good">Paid</x-badge>
+                    @elseif($fine->status === 'exempted')
+                        <x-badge tone="muted">Exempted</x-badge>
                     @else
                         <x-badge tone="bad">Unpaid</x-badge>
                     @endif

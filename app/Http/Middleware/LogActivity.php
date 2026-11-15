@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\Event;
 use App\Models\EventSession;
 use App\Models\Fine;
+use App\Models\FineExemption;
 use App\Models\Survey;
 use App\Models\User;
 use Closure;
@@ -44,6 +45,8 @@ class LogActivity
         'AdminController@storeOfficer' => 'Added an officer',
         'AdminController@startSemester' => 'Started a new semester',
         'AdminEventController@reprocess' => 'Fixed and charged an event again',
+        'FineExemptionController@store' => 'Exempted a student from an event',
+        'FineExemptionController@destroy' => 'Removed an exemption',
         'AdminStudentController@update' => 'Edited a student',
         'AdminStudentController@destroy' => 'Deleted a student',
         'BackupController@store' => 'Made a backup',
@@ -104,6 +107,7 @@ class LogActivity
                 $value instanceof Department => "{$value->name} ({$value->code})",
                 $value instanceof Fine => '₱' . number_format($value->amount, 2) . ' from ' . $value->user?->name,
                 $value instanceof Survey => $value->event?->name,
+                $value instanceof FineExemption => "{$value->user?->name} ({$value->user?->username}), {$value->event?->name}",
                 is_string($value) => $value,
                 default => null,
             };

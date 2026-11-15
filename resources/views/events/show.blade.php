@@ -4,6 +4,7 @@
 @php
     $sessions = $event->sessions;
     // One row per student, with that student's attendance per session
+    $exempted = $event->exemptions()->pluck('user_id')->flip();
     $byStudent = $event->attendances()->with('user')->get()->groupBy('user_id')
         ->map(fn ($rows) => ['user' => $rows->first()->user, 'sessions' => $rows->keyBy('event_session_id')])
         ->sortBy(fn ($r) => $r['user']->name)->values();
@@ -191,7 +192,10 @@
             <tbody>
                 @forelse($byStudent as $row)
                     <tr x-show="visible[{{ $loop->index }}]" @if($loop->index >= 50) style="display: none" @endif>
-                        <td class="font-semibold whitespace-nowrap">{{ $row['user']->name }}</td>
+                        <td class="font-semibold whitespace-nowrap">
+                            {{ $row['user']->name }}
+                            @if($exempted->has($row['user']->id)) <x-badge tone="muted">Exempted</x-badge> @endif
+                        </td>
                         @foreach($sessions as $session)
                             @php $a = $row['sessions']->get($session->id); @endphp
                             @if(!$a || $a->status === 'absent')

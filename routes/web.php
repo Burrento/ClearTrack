@@ -6,6 +6,7 @@ use App\Http\Controllers\EventController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\FineController;
+use App\Http\Controllers\FineExemptionController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AdminEventController;
 use App\Http\Controllers\AdminStudentController;
@@ -59,6 +60,9 @@ Route::middleware('auth')->group(function () {
         Route::get('fines/export/{format}', [FineController::class, 'export'])->whereIn('format', ['csv', 'pdf'])->name('fines.export');
         Route::post('fines/{fine}/pay', [FineController::class, 'markAsPaid'])->name('fines.markAsPaid');
         Route::post('fines/pay', [FineController::class, 'payGroup'])->name('fines.payGroup');
+        Route::get('exemptions', [FineExemptionController::class, 'index'])->name('exemptions.index');
+        Route::post('exemptions', [FineExemptionController::class, 'store'])->name('exemptions.store');
+        Route::delete('exemptions/{exemption}', [FineExemptionController::class, 'destroy'])->name('exemptions.destroy');
 
         Route::post('events/{event}/process-fines', [EventController::class, 'processFines'])->name('events.processFines');
         Route::post('events/{event}/sessions/{session}/start', [EventController::class, 'startSession'])->name('events.sessions.start');

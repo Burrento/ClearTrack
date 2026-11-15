@@ -9,6 +9,7 @@
             ['title' => 'Clearance process', 'sequence' => true, 'links' => [
                 $link('Events and attendance', 'events.index', 'events.*'),
                 $link('Fines', 'fines.index', 'fines.*'),
+                $link('Exempted', 'exemptions.index', 'exemptions.*'),
                 $link('Clearance', 'clearance.index', 'clearance.*'),
             ]],
             ['title' => 'Records', 'links' => [

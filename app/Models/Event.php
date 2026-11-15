@@ -50,6 +50,11 @@ class Event extends Model
         return $this->hasMany(Fine::class);
     }
 
+    public function exemptions()
+    {
+        return $this->hasMany(FineExemption::class);
+    }
+
     /**
      * Get the survey for the event.
      */
@@ -239,8 +244,12 @@ class Event extends Model
             $rows = $this->attendances()->get()->groupBy('event_session_id');
             $semesterId = Semester::current()?->id;
             $counts = ['absent' => 0, 'late' => 0, 'missed_in' => 0, 'missed_out' => 0];
+            $exempted = $this->exemptions()->pluck('user_id')->flip(); // excused: attendance is marked, no fines
 
-            $fine = function (User $student, string $kind, EventSession $session) use ($semesterId, &$counts) {
+            $fine = function (User $student, string $kind, EventSession $session) use ($semesterId, &$counts, $exempted) {
+                if ($exempted->has($student->id)) {
+                    return;
+                }
                 $counts[$kind]++;
                 $amount = $kind === 'absent'
                     ? ($session->has_in ? $this->missed_in_fine : 0) + ($session->has_out ? $this->missed_out_fine : 0)

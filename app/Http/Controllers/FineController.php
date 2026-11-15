@@ -24,18 +24,20 @@ class FineController extends Controller
             'q' => 'nullable|string|max:100',
             'event' => 'nullable|integer',
             'year' => ['nullable', Rule::in(User::YEAR_LEVELS)],
-            'status' => ['nullable', Rule::in(['unpaid', 'paid'])],
+            'status' => ['nullable', Rule::in(['unpaid', 'paid', 'exempted'])],
         ]);
         $unpaidSum = "SUM(CASE WHEN fines.status = 'unpaid' THEN fines.amount ELSE 0 END)";
+        $exemptedSum = "SUM(CASE WHEN fines.status = 'exempted' THEN fines.amount ELSE 0 END)";
 
         $groups = $this->departmentScope()
             ->join('users', 'users.id', '=', 'fines.user_id')
-            ->select('fines.user_id', 'fines.event_id', DB::raw('SUM(fines.amount) as total'), DB::raw("$unpaidSum as unpaid"), DB::raw('MAX(fines.created_at) as latest'))
+            ->select('fines.user_id', 'fines.event_id', DB::raw('SUM(fines.amount) as total'), DB::raw("$unpaidSum as unpaid"), DB::raw("$exemptedSum as exempted"), DB::raw('MAX(fines.created_at) as latest'))
             ->when($filters['q'] ?? null, fn ($q, $text) => $q->where(fn ($w) => $w->where('users.name', 'like', "%{$text}%")->orWhere('users.username', 'like', "%{$text}%")))
             ->when($filters['event'] ?? null, fn ($q, $id) => $q->where('fines.event_id', $id))
             ->when($filters['year'] ?? null, fn ($q, $year) => $q->where('users.year_level', $year))
             ->when(($filters['status'] ?? null) === 'unpaid', fn ($q) => $q->havingRaw("$unpaidSum > 0"))
-            ->when(($filters['status'] ?? null) === 'paid', fn ($q) => $q->havingRaw("$unpaidSum = 0"))
+            ->when(($filters['status'] ?? null) === 'paid', fn ($q) => $q->havingRaw("$unpaidSum = 0")->havingRaw("$exemptedSum < SUM(fines.amount)"))
+            ->when(($filters['status'] ?? null) === 'exempted', fn ($q) => $q->havingRaw("$exemptedSum > 0"))
             ->groupBy('fines.user_id', 'fines.event_id', 'users.name')
             ->orderByDesc('latest')->orderBy('users.name')
             ->paginate(50)->withQueryString();

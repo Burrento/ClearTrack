@@ -38,9 +38,10 @@
     <label class="w-full sm:w-36">
         <span class="sr-only">Status</span>
         <select name="status" class="input">
-            <option value="">Paid and unpaid</option>
+            <option value="">Any status</option>
             <option value="unpaid" @selected(($filters['status'] ?? '') === 'unpaid')>Unpaid</option>
             <option value="paid" @selected(($filters['status'] ?? '') === 'paid')>Paid</option>
+            <option value="exempted" @selected(($filters['status'] ?? '') === 'exempted')>Exempted</option>
         </select>
     </label>
     <button type="submit" class="btn btn-secondary">Filter</button>
@@ -76,7 +77,7 @@
                     <td>
                         <span class="block">{{ $event?->name ?? 'Clearance' }}@if($event), {{ $event->start_time->format('M j') }}@endif</span>
                         <span class="block text-sm text-ink-soft">
-                            {{ $rowFines->map(fn ($f) => ($f->reason ?? 'Fine') . ' ₱' . number_format($f->amount, 2) . ($f->status === 'paid' ? ' (paid)' : ''))->implode(', ') }}
+                            {{ $rowFines->map(fn ($f) => ($f->reason ?? 'Fine') . ' ₱' . number_format($f->amount, 2) . (in_array($f->status, ['paid', 'exempted'], true) ? " ({$f->status})" : ''))->implode(', ') }}
                         </span>
                     </td>
                     <td class="text-right font-semibold whitespace-nowrap">
@@ -88,6 +89,8 @@
                     <td>
                         @if($group->unpaid > 0)
                             <x-badge tone="bad">Unpaid</x-badge>
+                        @elseif($group->exempted >= $group->total)
+                            <x-badge tone="muted">Exempted</x-badge>
                         @else
                             <x-badge tone="good">Paid</x-badge>
                         @endif
