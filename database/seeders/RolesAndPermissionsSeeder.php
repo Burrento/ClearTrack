@@ -50,6 +50,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'name' => 'Test Student',
             'username' => $studentId,
             'password' => Hash::make(User::defaultPassword('Test Student', $studentId)),
+            'password_changed_at' => now(), // demo login: skip the first-login password change
             'department_id' => $sit->id,
             'rfid_uid' => '1234567890',
             'year_level' => 'First Year',

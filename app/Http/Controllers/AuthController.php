@@ -61,13 +61,15 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', Password::defaults(), 'confirmed'],
+            'password' => ['required', Password::defaults(), 'confirmed', 'different:current_password'],
         ]);
 
-        $request->user()->update([
-            'password' => Hash::make($validated['password']),
-        ]);
+        $user = $request->user();
+        $firstTime = !$user->password_changed_at;
+        $user->update(['password' => Hash::make($validated['password']), 'password_changed_at' => now()]);
 
-        return back()->with('status', 'Password changed.');
+        return $firstTime && $user->hasRole('student')
+            ? redirect()->route('dashboard')->with('status', 'Password changed. Welcome to ClearTrack!')
+            : back()->with('status', 'Password changed.');
     }
 }

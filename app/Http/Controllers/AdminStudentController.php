@@ -77,7 +77,7 @@ class AdminStudentController extends Controller
         $validated['is_active'] = $request->boolean('is_active');
 
         $password = $request->boolean('reset_password') ? User::defaultPassword($validated['name'], $validated['username']) : null;
-        $user->update($validated + ($password ? ['password' => Hash::make($password)] : []));
+        $user->update($validated + ($password ? ['password' => Hash::make($password), 'password_changed_at' => null] : []));
 
         return redirect()->route('admin.students')->with('status', "Changes saved for {$user->name}."
             . ($password ? " Password reset to: {$password}" : ''));

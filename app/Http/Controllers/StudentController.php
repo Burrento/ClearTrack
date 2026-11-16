@@ -100,7 +100,7 @@ class StudentController extends Controller
         // A corrected name or ID doesn't change the password on its own; the officer can reset it to the
         // default for the corrected details (also how a student who forgot their password gets back in).
         $password = $request->boolean('reset_password') ? User::defaultPassword($validated['name'], $validated['username']) : null;
-        $user->update($validated + ($password ? ['password' => Hash::make($password)] : []));
+        $user->update($validated + ($password ? ['password' => Hash::make($password), 'password_changed_at' => null] : []));
 
         return redirect()->route('students.index')->with('status', "Changes saved for {$user->name}. RFID card: " . ($user->formattedRfid() ?? 'None')
             . ($password ? ". Password reset to: {$password}" : ''));

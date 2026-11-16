@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Only localhost, so visitors can't spoof X-Forwarded-For to dodge the login throttle.
         $middleware->trustProxies(at: ['127.0.0.1', '::1']);
 
+        // Students on the default password change it first; before logging, so blocked requests aren't logged
+        $middleware->appendToGroup('web', \App\Http\Middleware\RequirePasswordChange::class);
+
         // After route-model binding, so log entries can name the student/event an action was about
         $middleware->appendToGroup('web', \App\Http\Middleware\LogActivity::class);
 

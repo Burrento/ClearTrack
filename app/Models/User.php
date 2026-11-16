@@ -12,7 +12,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'username', 'password', 'department_id', 'rfid_uid', 'year_level', 'is_active'])]
+#[Fillable(['name', 'username', 'password', 'password_changed_at', 'department_id', 'rfid_uid', 'year_level', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -125,6 +125,7 @@ class User extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'password_changed_at' => 'datetime',
         ];
     }
 }

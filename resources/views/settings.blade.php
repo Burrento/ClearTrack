@@ -4,6 +4,13 @@
 <div class="mx-auto max-w-2xl">
     <x-page-header title="Account" />
 
+    @if(auth()->user()->hasRole('student') && !auth()->user()->password_changed_at)
+        <div class="mb-8 rounded-xl border-2 border-seal bg-seal-wash px-5 py-4" role="alert">
+            <p class="font-semibold">Change your password to continue.</p>
+            <p class="text-ink-soft">You're signed in with the default password (your last name and ID number), which others could guess. Choose your own below; you can use ClearTrack right after.</p>
+        </div>
+    @endif
+
     <dl class="panel panel-body mb-8 grid gap-5 sm:grid-cols-3">
         <div>
             <dt class="text-sm text-ink-soft">Name</dt>
