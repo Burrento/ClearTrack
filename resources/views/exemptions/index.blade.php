@@ -10,6 +10,7 @@
             <label for="event_id" class="label">Event</label>
             <select id="event_id" name="event_id" required @class(['input', 'input-invalid' => $errors->has('event_id')])>
                 <option value="">Choose an event</option>
+                <option value="all" @selected(old('event_id') === 'all')>All events ({{ $events->count() }})</option>
                 @foreach($events as $event)
                     <option value="{{ $event->id }}" @selected((string) old('event_id', $filters['event'] ?? '') === (string) $event->id)>{{ $event->name }}, {{ $event->start_time->format('M j, Y') }}</option>
                 @endforeach

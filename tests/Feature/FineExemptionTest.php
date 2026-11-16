@@ -89,6 +89,27 @@ class FineExemptionTest extends TestCase
         $this->assertFalse($this->student->fresh()->isCleared());
     }
 
+    public function test_all_events_exempts_from_every_existing_event(): void
+    {
+        $day1 = $this->endedEvent();
+        $day1->markAbsentees(); // charged: ₱100 each
+        $day2 = $this->endedEvent('Day 2');
+        $this->exempt($day2, $this->student); // already exempted from Day 2: skipped, not doubled
+        $otherDept = Event::create(['department_id' => Department::where('id', '!=', $this->officer->department_id)->value('id'), 'name' => 'Theirs', 'start_time' => now()->subHours(3), 'end_time' => now()->subHours(2)]);
+
+        $this->actingAs($this->officer)->post(route('exemptions.store'), ['event_id' => 'all', 'student_id' => $this->student->username, 'reason' => 'Medical'])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', "{$this->student->name} is exempted from {$day1->name}. 1 fine (₱100.00) marked exempted.");
+
+        $this->assertSame([$day1->id, $day2->id], FineExemption::where('user_id', $this->student->id)->orderBy('event_id')->pluck('event_id')->all());
+        $this->assertFalse($otherDept->exemptions()->exists());
+        $this->assertSame('exempted', Fine::where('user_id', $this->student->id)->value('status'));
+
+        $this->actingAs($this->officer)->post(route('exemptions.store'), ['event_id' => 'all', 'student_id' => $this->student->username, 'reason' => 'Medical'])
+            ->assertSessionHasErrors('student_id'); // nothing left to exempt
+        $this->post(route('exemptions.store'), ['event_id' => 'nonsense', 'student_id' => $this->student->username, 'reason' => 'x'])->assertSessionHasErrors('event_id');
+    }
+
     public function test_reason_required_no_duplicates_and_own_department_only(): void
     {
         $event = $this->endedEvent();

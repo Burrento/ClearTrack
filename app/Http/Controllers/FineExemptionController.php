@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
+use App\Models\Fine;
 use App\Models\FineExemption;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -39,31 +40,43 @@ class FineExemptionController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'event_id' => 'required|integer|exists:events,id',
+            'event_id' => ['required', 'regex:/^(all|\d+)$/'], // "all" = every event the department has now
             'student_id' => 'required|string|max:50',
             'reason' => 'required|string|max:255',
         ]);
 
-        $event = Event::findOrFail($validated['event_id']);
-        $this->authorizeDepartment($event->department_id);
+        if ($validated['event_id'] === 'all') {
+            $events = Event::where('department_id', Auth::user()->department_id)->get();
+        } else {
+            $event = Event::findOrFail($validated['event_id']);
+            $this->authorizeDepartment($event->department_id);
+            $events = collect([$event]);
+        }
 
         $student = User::role('student')->where('department_id', Auth::user()->department_id)
             ->where('username', strtoupper(trim($validated['student_id'])))->first();
         if (!$student) {
             return back()->withInput()->withErrors(['student_id' => 'No student in your department has this ID.']);
         }
-        if ($event->exemptions()->where('user_id', $student->id)->exists()) {
-            return back()->withInput()->withErrors(['student_id' => "{$student->name} is already exempted from this event."]);
+
+        // Events they're already exempted from are skipped
+        $events = $events->reject(fn ($event) => $event->exemptions()->where('user_id', $student->id)->exists());
+        if ($events->isEmpty()) {
+            return back()->withInput()->withErrors(['student_id' => "{$student->name} is already exempted from " . ($validated['event_id'] === 'all' ? 'every event.' : 'this event.')]);
         }
 
-        $event->exemptions()->create(['user_id' => $student->id, 'reason' => trim($validated['reason']), 'created_by_id' => Auth::id()]);
+        foreach ($events as $event) {
+            $event->exemptions()->create(['user_id' => $student->id, 'reason' => trim($validated['reason']), 'created_by_id' => Auth::id()]);
+        }
 
-        $fines = $event->fines()->where('user_id', $student->id)->where('status', 'unpaid');
+        $fines = Fine::whereIn('event_id', $events->pluck('id'))->where('user_id', $student->id)->where('status', 'unpaid');
         $count = (clone $fines)->count();
         $total = (clone $fines)->sum('amount');
         $fines->update(['status' => 'exempted']);
 
-        return redirect()->route('exemptions.index')->with('status', "{$student->name} is exempted from {$event->name}."
+        $what = $events->count() === 1 ? $events->first()->name : $events->count() . ' events';
+
+        return redirect()->route('exemptions.index')->with('status', "{$student->name} is exempted from {$what}."
             . ($count ? " {$count} " . ($count === 1 ? 'fine' : 'fines') . ' (₱' . number_format($total, 2) . ') marked exempted.' : ''));
     }
 
