@@ -70,7 +70,8 @@ class User extends Authenticatable
     /**
      * Default student password: last name with a capital first letter + the number after the ID's
      * last dash, e.g. "Juan Santos" / LGC25-105680 → Santos105680, LGC26-6578 → Santos6578,
-     * LGC26-2-0014 → Santos0014. "Dela Cruz, Juan" → Delacruz105680.
+     * LGC26-2-0014 → Santos0014. "Dela Cruz, Juan" → Delacruz105680. Ñ becomes n, since many
+     * keyboards can't type it: "Ana Peña" → Pena105680.
      */
     public static function defaultPassword(string $name, string $studentId): string
     {
@@ -79,7 +80,7 @@ class User extends Authenticatable
 
         $number = preg_match('/(\d+)$/', $studentId, $m) ? $m[1] : substr($studentId, -6);
 
-        return Str::ucfirst(Str::lower(preg_replace('/\s+/', '', $lastName))) . $number;
+        return Str::ucfirst(str_replace('ñ', 'n', Str::lower(preg_replace('/\s+/', '', $lastName)))) . $number;
     }
 
     /**

@@ -16,7 +16,21 @@ class RegistrationTest extends TestCase
     {
         $this->assertSame('Santos105680', User::defaultPassword('Juan SANTOS', 'LGC25-105680'));
         $this->assertSame('Delacruz105680', User::defaultPassword('Dela Cruz, Juan', 'LGC25-105680'));
-        $this->assertSame('Peña105680', User::defaultPassword('Ana peña ', 'LGC25-105680'));
+        $this->assertSame('Pena105680', User::defaultPassword('Ana peña ', 'LGC25-105680'));
+        $this->assertSame('Nunez6578', User::defaultPassword('ÑUÑEZ, Jose', 'LGC26-6578'));
+    }
+
+    public function test_students_still_on_the_old_n_tilde_default_password_move_to_the_plain_n_one(): void
+    {
+        $onDefault = User::factory()->create(['name' => 'Ana Peña', 'username' => 'LGC25-105680', 'password' => Hash::make('Peña105680')]);
+        $ownPassword = User::factory()->create(['name' => 'Jose Muñoz', 'username' => 'LGC25-105681', 'password' => Hash::make('MySecret1')]);
+        $changed = User::factory()->create(['name' => 'Rosa Ibañez', 'username' => 'LGC25-105682', 'password' => Hash::make('Ibañez105682'), 'password_changed_at' => now()]);
+
+        (require database_path('migrations/2026_11_17_000002_default_passwords_use_n_instead_of_n_tilde.php'))->up();
+
+        $this->assertTrue(Hash::check('Pena105680', $onDefault->fresh()->password));
+        $this->assertTrue(Hash::check('MySecret1', $ownPassword->fresh()->password));
+        $this->assertTrue(Hash::check('Ibañez105682', $changed->fresh()->password));
     }
 
     public function test_registered_student_can_log_in_with_default_password(): void
