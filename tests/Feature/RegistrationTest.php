@@ -22,9 +22,9 @@ class RegistrationTest extends TestCase
 
     public function test_students_still_on_the_old_n_tilde_default_password_move_to_the_plain_n_one(): void
     {
-        $onDefault = User::factory()->create(['name' => 'Ana Peña', 'username' => 'LGC25-105680', 'password' => Hash::make('Peña105680')]);
-        $ownPassword = User::factory()->create(['name' => 'Jose Muñoz', 'username' => 'LGC25-105681', 'password' => Hash::make('MySecret1')]);
-        $changed = User::factory()->create(['name' => 'Rosa Ibañez', 'username' => 'LGC25-105682', 'password' => Hash::make('Ibañez105682'), 'password_changed_at' => now()]);
+        $onDefault = User::create(['name' => 'Ana Peña', 'username' => 'LGC25-105680', 'password' => Hash::make('Peña105680')]);
+        $ownPassword = User::create(['name' => 'Jose Muñoz', 'username' => 'LGC25-105681', 'password' => Hash::make('MySecret1')]);
+        $changed = User::create(['name' => 'Rosa Ibañez', 'username' => 'LGC25-105682', 'password' => Hash::make('Ibañez105682'), 'password_changed_at' => now()]);
 
         (require database_path('migrations/2026_11_17_000002_default_passwords_use_n_instead_of_n_tilde.php'))->up();
 
