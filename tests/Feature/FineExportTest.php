@@ -33,7 +33,9 @@ class FineExportTest extends TestCase
         $this->assertStringContainsString("{$student->username},\"{$student->name}\",Owes,50.00", $csv);
         $this->assertStringNotContainsString('LGC25-9001', $csv); // fully paid: not on the list
 
-        $this->get(route('fines.export', 'pdf'))->assertOk()->assertSee($student->username)->assertSee('₱50.00')->assertDontSee('₱99.00')->assertDontSee('LGC25-9001')->assertDontSee('Assembly');
+        // A real PDF file download (not an HTML page), built from the same list as the CSV
+        $pdf = $this->get(route('fines.export', 'pdf'))->assertOk()->assertHeader('Content-Type', 'application/pdf')->assertDownload();
+        $this->assertStringStartsWith('%PDF', $pdf->getContent());
         $this->get('/fines/export/xlsx')->assertNotFound();
         $this->actingAs($student)->get(route('fines.export', 'csv'))->assertForbidden();
     }

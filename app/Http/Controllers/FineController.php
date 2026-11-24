@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use App\Models\Fine;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -80,7 +81,7 @@ class FineController extends Controller
             . ' (' . ($event?->name ?? 'clearance fines') . ').');
     }
 
-    /** Students who still owe (ID, name, status, unpaid amount), as a CSV or a printable page saved as PDF. */
+    /** Students who still owe (ID, name, status, unpaid amount), as a CSV or PDF download. */
     public function export(string $format)
     {
         $department = Auth::user()->department;
@@ -93,7 +94,8 @@ class FineController extends Controller
             ->sortBy(fn ($s) => $s->user->name, SORT_NATURAL | SORT_FLAG_CASE)->values();
 
         if ($format === 'pdf') {
-            return view('fines.print', compact('students', 'department'));
+            return Pdf::loadView('fines.print', compact('students', 'department'))
+                ->download('fines-' . strtolower($department->code) . '-' . now()->format('Y-m-d') . '.pdf');
         }
 
         return response()->streamDownload(function () use ($students) {

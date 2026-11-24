@@ -5,7 +5,7 @@
     :description="$owingCount . ' ' . \Illuminate\Support\Str::plural('student', $owingCount) . ' owe ₱' . number_format($unpaidTotal, 2) . ' in total. Each row is one student\'s fines for one event; record a payment when they pay.'">
     @if($owingCount)
         <a href="{{ route('fines.export', 'csv') }}" class="btn btn-secondary">Export CSV</a>
-        <a href="{{ route('fines.export', 'pdf') }}" target="_blank" class="btn btn-secondary">Export PDF</a>
+        <a href="{{ route('fines.export', 'pdf') }}" class="btn btn-secondary">Export PDF</a>
     @endif
 </x-page-header>
 

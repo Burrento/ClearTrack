@@ -6,7 +6,7 @@
     <title>Fines, {{ $department->code }}, {{ now()->format('Y-m-d') }}</title>
     <style>
         @page { size: A4; margin: 14mm; }
-        body { font: 11px/1.4 system-ui, sans-serif; color: #111; margin: 0; }
+        body { font: 11px/1.4 'DejaVu Sans', sans-serif; color: #111; margin: 0; } /* DejaVu: dompdf's bundled font with ₱ and ñ */
         h1 { font-size: 18px; margin: 0 0 2px; }
         p { margin: 0 0 12px; color: #444; }
         table { width: 100%; border-collapse: collapse; }
@@ -14,15 +14,12 @@
         thead th { border-bottom: 2px solid #111; }
         thead { display: table-header-group; }
         tbody td { border-bottom: 1px solid #ccc; }
-        tr { break-inside: avoid; }
+        tr { page-break-inside: avoid; }
         .num { text-align: right; white-space: nowrap; }
         .owes { color: #b42318; }
-        .no-print { margin-bottom: 12px; }
-        @media print { .no-print { display: none; } }
     </style>
 </head>
 <body>
-    <div class="no-print"><button onclick="window.print()">Save as PDF / Print</button></div>
     <h1>Fines, {{ $department->name }}</h1>
     <p>Exported {{ now()->format('F j, Y g:i A') }}. {{ $students->count() }} {{ \Illuminate\Support\Str::plural('student', $students->count()) }} still owe, ₱{{ number_format($unpaidTotal, 2) }} in total.</p>
     <table>
@@ -40,6 +37,5 @@
             @endforeach
         </tbody>
     </table>
-    <script>window.addEventListener('load', () => window.print());</script>
 </body>
 </html>

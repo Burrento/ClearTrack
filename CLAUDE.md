@@ -44,3 +44,28 @@ Seeded logins (`RolesAndPermissionsSeeder`): `superadmin` / `password` (admin), 
 **Models** use PHP attributes (`#[Fillable]`, `#[Hidden]`) instead of `$fillable` properties — follow that style.
 
 **Docs**: `docs/database-erd.mmd` is a Mermaid ERD of the schema; `docs/superpowers/` holds design specs/plans.
+
+## Before every push to `main`: database check
+
+**A push to `main` is a production deploy.** `.github/workflows/deploy.yml` runs the tests, then SSHes into the Droplet and runs `deploy.sh`: pull, build, `mysqldump` to `~/backups/pre-deploy-*.sql.gz`, then `php artisan migrate --force` on the live MySQL. No manual step in between. **Never push without doing this first, then asking Brent.**
+
+1. **What migrations ship:** `git diff --name-only origin/main...HEAD -- database/migrations`. Read each one, `up()` and `down()`.
+2. **Flag anything risky:**
+   - Data loss: `dropColumn`, `Schema::drop`, deleting rows.
+   - Data rewrites on real student records (passwords, fines, attendance, statuses): say how many rows and whether it can be reversed.
+   - `renameColumn`, `->change()`, a new non-null column without a default, a new unique index on data that may have duplicates.
+   - An empty or missing `down()`: `migrate:rollback` can't undo it.
+3. **SQLite vs MySQL:** tests and local dev use SQLite; production is MySQL. Check for MySQL-only failures (`->change()`, enum/JSON columns, index length, raw `DB::statement` SQL). MySQL can't roll back DDL, so a migration that fails halfway leaves the schema half-changed.
+4. **Code is live before migrations finish:** `deploy.sh` pulls and builds first, then migrates. If `migrate` fails, the new code is already serving against the old schema. Prefer migrations the old and new code both survive (add first, remove in a later push).
+5. **Server `.env`:** `config:cache` runs on deploy, and `deploy.sh` adds only `BACKUP_PATH`. Any new env key must be added on the server before pushing.
+6. **Timing:** taps post live (`logRfid`) and `cleartrack:process-fines` runs every 5 minutes. Don't push during an event; ask whether one is running.
+7. **Tests:** run `php artisan test` locally (CI runs it too, but find failures before the push, not during it).
+
+**Then stop and ask Brent before pushing,** in plain words:
+- What changes, for whom (students, officers, admin).
+- Database impact: none / additive / risky, which migration, and how many rows it touches.
+- What could break, and whether an event is running now.
+- How to undo it: `php artisan migrate:rollback --step=N` on the server if every `down()` works, otherwise restore the pre-deploy dump (`docs/deploy-digitalocean.md`). Say plainly if it can't be undone.
+- The exact commands, in order.
+
+If anything is unclear (which branch, whether to push now, whether data matters), ask before acting. Never push without an explicit yes.
