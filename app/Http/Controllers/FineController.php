@@ -85,11 +85,11 @@ class FineController extends Controller
     public function export(string $format)
     {
         $department = Auth::user()->department;
-        $students = $this->departmentScope()->with('user')->get()->groupBy('user_id')
-            ->map(fn ($fines) => (object) [
-                'user' => $fines->first()->user,
-                'unpaid' => $fines->where('status', 'unpaid')->sum('amount'),
-            ])
+        // Summed in SQL: loading every fine as a model runs out of memory on a big department
+        $unpaid = $this->departmentScope()->where('status', 'unpaid')
+            ->groupBy('user_id')->selectRaw('user_id, SUM(amount) AS total')->pluck('total', 'user_id');
+        $students = User::whereIn('id', $unpaid->keys())->get(['id', 'username', 'name'])
+            ->map(fn ($user) => (object) ['user' => $user, 'unpaid' => (float) $unpaid[$user->id]])
             ->filter(fn ($s) => $s->unpaid > 0)
             ->sortBy(fn ($s) => $s->user->name, SORT_NATURAL | SORT_FLAG_CASE)->values();
 

@@ -1,4 +1,8 @@
-@php $unpaidTotal = $students->sum('unpaid'); @endphp
+@php
+    $unpaidTotal = $students->sum('unpaid');
+    // One fixed-width text line per student: dompdf needs ~0.2 MB per table row and ran out of memory on big lists
+    $line = fn ($id, $name, $status, $amount) => str_pad($id, 15) . mb_str_pad(mb_strimwidth($name, 0, 40, '…'), 42) . str_pad($status, 8) . mb_str_pad($amount, 13, ' ', STR_PAD_LEFT);
+@endphp
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,36 +10,18 @@
     <title>Fines, {{ $department->code }}, {{ now()->format('Y-m-d') }}</title>
     <style>
         @page { size: A4; margin: 14mm; }
-        body { font: 11px/1.4 'DejaVu Sans', sans-serif; color: #111; margin: 0; } /* DejaVu: dompdf's bundled font with ₱ and ñ */
+        body { font: 12px/1.4 'DejaVu Sans', sans-serif; color: #111; margin: 0; } /* DejaVu: dompdf's bundled font with ₱ and ñ */
         h1 { font-size: 18px; margin: 0 0 2px; }
         p { margin: 0 0 12px; color: #444; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 5px 6px; vertical-align: top; }
-        thead th { border-bottom: 2px solid #111; }
-        thead { display: table-header-group; }
-        tbody td { border-bottom: 1px solid #ccc; }
-        tr { page-break-inside: avoid; }
-        .num { text-align: right; white-space: nowrap; }
-        .owes { color: #b42318; }
+        pre { font: 9.5px/1.7 'DejaVu Sans Mono', monospace; margin: 0; }
+        .head { font-weight: bold; border-bottom: 1.5px solid #111; }
     </style>
 </head>
 <body>
     <h1>Fines, {{ $department->name }}</h1>
     <p>Exported {{ now()->format('F j, Y g:i A') }}. {{ $students->count() }} {{ \Illuminate\Support\Str::plural('student', $students->count()) }} still owe, ₱{{ number_format($unpaidTotal, 2) }} in total.</p>
-    <table>
-        <thead>
-            <tr><th>Student ID</th><th>Name</th><th>Status</th><th class="num">Amount</th></tr>
-        </thead>
-        <tbody>
-            @foreach($students as $s)
-                <tr>
-                    <td>{{ $s->user->username }}</td>
-                    <td>{{ $s->user->name }}</td>
-                    <td @class(['owes' => $s->unpaid > 0])>{{ $s->unpaid > 0 ? 'Owes' : 'Cleared' }}</td>
-                    <td class="num">₱{{ number_format($s->unpaid, 2) }}</td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
+    <pre class="head">{{ $line('Student ID', 'Name', 'Status', 'Amount') }}</pre>
+    <pre>@foreach($students as $s){{ $line($s->user->username, $s->user->name, 'Owes', '₱' . number_format($s->unpaid, 2)) }}
+@endforeach</pre>
 </body>
 </html>
